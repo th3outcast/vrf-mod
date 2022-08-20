@@ -9,9 +9,11 @@ use openssl::{
 /// Converts a non-negative BigNum integer to an octet string of specified length as 
 /// defined in [Section 4.1 of RFC8017](https://datatracker.ietf.org/doc/pdf/rfc8017#section-4.1)
 /// 
-/// Arguments:
-///     x: unsigned BigNum integer to be converted
+/// @arguments:
+///     num: unsigned BigNum integer to be converted
 ///     xlen: length of octet string to return
+///
+/// @returns a vector representing the octet string in big-endian
 ///
 pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
     // Set base 256
@@ -26,7 +28,6 @@ pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
     }
 
     let mut octet: Vec<u8> = Vec::with_capacity(xlen);
-    //let mut div = BigNum::new()?;
     let mut rem = BigNum::new()?;
 
     for _ in 0..xlen {
@@ -41,6 +42,37 @@ pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
     octet.reverse();
     Ok(octet)
 }
+
+/// Converts an octet string to a non-negative BigNum integer as 
+/// defined in [Section 4.2 of RFC8017](https://datatracker.ietf.org/doc/pdf/rfc8017#section-4.2)
+/// 
+/// @arguments:
+///     octet: slice representing octet string to be converted to a BigNum integer
+/// 
+/// @returns a non-negative BigNum integer
+///
+pub fn os2ip(octet: &[u8]) -> Result<BigNum, ErrorStack> {
+    let base = BigNum::from_u32(256)?;
+    let mut bn_ctx = BigNumContext::new()?;
+
+    let length = octet.len();
+    let mut sum = BigNum::new()?;
+    let mut step = BigNum::new()?;
+    let mut mul = BigNum::new()?;
+    //let mut dup = BigNum::new()?;
+    for (index, num) in octet.iter().enumerate() {
+        let mut dup = BigNum::new()?;
+        let num = BigNum::from_u32(*num as u32).unwrap();
+        let pow = BigNum::from_u32((&length - 1 - index) as u32)?;
+
+        step.exp(&base, &pow, &mut bn_ctx)?;
+        mul.checked_mul(&num, &step, &mut bn_ctx)?;
+        dup.checked_add(&sum, &mul)?;
+        sum = dup;
+    }
+
+    Ok(sum)
+} 
 
 #[cfg(test)]
 mod tests {
