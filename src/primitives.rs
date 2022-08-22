@@ -4,6 +4,8 @@
 use openssl::{
     bn::{BigNum},
     error::ErrorStack,
+    rsa::Rsa,
+    pkey::Private,
 };
 
 /// Converts a non-negative BigNum integer to an octet string of specified length as 
@@ -73,6 +75,23 @@ pub fn os2ip(octet: &[u8]) -> Result<BigNum, ErrorStack> {
 
     Ok(sum)
 } 
+
+/// RSASP1 signature primitive defined in
+/// (Section 5.2.1 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.1]
+///
+pub fn rsasp1(secret_key: &Rsa<Private>, message: &BigNum) -> Result<BigNum, ErrorStack> {
+    let n = secret_key.n();
+    let d = secret_key.d();
+    let mut signature = BigNum::new()?;
+    let mut bn_ctx = BigNumContext::new()?;
+
+    if *message > (n - &BigNum::from_u32(1)?) {
+        panic!("Invalid message length")
+    }
+
+    signature.mod_exp(&message, d, n, &mut bn_ctx)?;
+    Ok(signature)
+}
 
 #[cfg(test)]
 mod tests {
