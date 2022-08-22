@@ -79,18 +79,47 @@ pub fn os2ip(octet: &[u8]) -> Result<BigNum, ErrorStack> {
 /// RSASP1 signature primitive defined in
 /// (Section 5.2.1 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.1]
 ///
+/// @arguments: 
+///     secret_key: Rsa private key
+///     message: BigNum message representation
+///
+/// @returns a signature representative
+///
 pub fn rsasp1(secret_key: &Rsa<Private>, message: &BigNum) -> Result<BigNum, ErrorStack> {
     let n = secret_key.n();
     let d = secret_key.d();
     let mut signature = BigNum::new()?;
     let mut bn_ctx = BigNumContext::new()?;
 
-    if *message > (n - &BigNum::from_u32(1)?) {
+    if *message > (n - &BigNum::from_u32(1)?) && !message.is_negative() {
         panic!("Invalid message length")
     }
 
     signature.mod_exp(&message, d, n, &mut bn_ctx)?;
     Ok(signature)
+}
+
+/// RSAVP1 verification primitive defined in
+/// (Section 5.2.2 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.2]
+/// 
+/// @argument:
+///     public_key: Rsa public key
+///     signature: signed message to extract
+///
+/// @returns a BigNum representing the message extracted from the signature
+///
+pub fn rsavp1(public_key: &Rsa<Public>, signature: &BigNum) -> Result<BigNum, ErrorStack> {
+    let n = public_key.n();
+    let e = public_key.e();
+    let mut message = BigNum::new()?;
+    let mut bn_ctx = BigNumContext::new()?;
+
+    if *signature > (n - &BigNum::from_u32(1)?) && !signature.is_negative() {
+        panic!("Invalid message length")
+    }
+
+    message.mod_exp(&signature, e, n, &mut bn_ctx)?;
+    Ok(message)
 }
 
 #[cfg(test)]
