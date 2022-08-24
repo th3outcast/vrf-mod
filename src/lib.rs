@@ -34,10 +34,25 @@
 //!
 //! * Compute VRF proof
 //! * Verify VRF proof
+use openssl::{
+    bn::{BigNum, BigNumContext},
+    error::ErrorStack,
+    rsa::Rsa,
+    pkey::{Private, Public},
+};
 
-pub struct VRF {
+mod primitives;
 
+/// Cipher suites for VRF
+#[derive(Debug)]
+pub enum VRFCipherSuite {
+    /// Set MGF hash function as SHA-1
+    PKI_MGF_MGF1SHA1,
+    /// Set MGF hash function as SHA-256
+    PKI_MGF_MGF1SHA256
 }
+
+pub struct VRF {}
 
 impl VRF {
     
