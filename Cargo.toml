@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 openssl = { version = "0.10" }
+bytes = "1.2.1"
