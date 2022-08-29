@@ -40,20 +40,27 @@ use openssl::{
     //rsa::Rsa,
     //pkey::{Private, Public},
     hash::{Hasher, MessageDigest},
+    rsa::Rsa,
+    pkey::{Private}
 };
 use bytes::BytesMut;
 
 mod primitives;
 
-use primitives::i20sp;
+use primitives::{
+    i20sp,
+    os2ip,
+    rsasp1,
+};
 
 /// Cipher suites for VRF
+#[allow(non_camel_case_types)]
 #[derive(Debug)]
 pub enum VRFCipherSuite {
     /// Set MGF hash function as SHA-1
-    PKI_MGF_MGF1SHA1,
+    PKI_MGF_MGF1_SHA1,
     /// Set MGF hash function as SHA-256
-    PKI_MGF_MGF1SHA256
+    PKI_MGF_MGF1_SHA256
 }
 
 pub struct VRF {
@@ -79,8 +86,8 @@ impl VRF {
 
         // Hasher digest
         let hasher = match suite {
-            VRFCipherSuite::PKI_MGF_MGF1SHA1 => Hasher::new(MessageDigest::sha1())?,
-            VRFCipherSuite::PKI_MGF_MGF1SHA256 => Hasher::new(MessageDigest::sha256())?,
+            VRFCipherSuite::PKI_MGF_MGF1_SHA1 => Hasher::new(MessageDigest::sha1())?,
+            VRFCipherSuite::PKI_MGF_MGF1_SHA256 => Hasher::new(MessageDigest::sha256())?,
         };
 
         Ok(VRF {
@@ -126,6 +133,45 @@ impl VRF {
             octet.extend_from_slice(digest.as_slice());
         }
         Ok(octet.to_vec())
+    }
+
+    /// RSA-FDH-VRF prooving algorithm as defined
+    /// in Section 4.1 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    /// @arguments:
+    ///     secret_key: RSA private key
+    ///     alpha_string: VRF hash input, an octet string
+    ///
+    /// @returns pi_string: proof, an octet string of length k
+    ///
+    pub fn rsafdhvrf_prove(&mut self, secret_key: &Rsa<Private>, alpha_string: &[u8]) -> Result<Vec<u8>, ErrorStack> {
+        let one_string: u8 = 0x01;
+        let mut n = secret_key.n().to_owned().unwrap();
+        let k = &n.to_vec().len();
+        if !(*k < 4_294_967_295usize) {
+            panic!()
+        }
+        
+        // mgf1(one_string || i20sp(k, 4) || i20sp(n, k) || alpha_string, k - 1)
+        // create a mutable byte sequence to concatenate entries
+        let mut sequence = BytesMut::new();
+        sequence.extend_from_slice(&[one_string]);
+
+        let mut num = BigNum::from_u32(*k as u32)?;
+        let i2 = i20sp(&mut num, 4).unwrap();
+        sequence.extend_from_slice(i2.as_slice());
+
+        let i3 = i20sp(&mut n, *k).unwrap();
+        sequence.extend_from_slice(i3.as_slice());
+
+        sequence.extend_from_slice(alpha_string);
+
+        let em = self.mgf1(&sequence, k - 1, None).unwrap();
+        let m = os2ip(&em.as_slice()).unwrap();
+        let mut s = rsasp1(secret_key, &m).unwrap();
+        let pi_string = i20sp(&mut s, *k).unwrap();
+
+        Ok(pi_string)
     }
 }
 

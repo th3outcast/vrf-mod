@@ -2,10 +2,10 @@
 //!
 
 use openssl::{
-    bn::{BigNum},
+    bn::{BigNum, BigNumContext},
     error::ErrorStack,
     rsa::Rsa,
-    pkey::Private,
+    pkey::{Private, Public},
 };
 
 /// Converts a non-negative BigNum integer to an octet string of specified length as 
@@ -102,7 +102,7 @@ pub fn rsasp1(secret_key: &Rsa<Private>, message: &BigNum) -> Result<BigNum, Err
 /// RSAVP1 verification primitive defined in
 /// (Section 5.2.2 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.2]
 /// 
-/// @argument:
+/// @arguments:
 ///     public_key: Rsa public key
 ///     signature: signed message to extract
 ///
@@ -121,7 +121,33 @@ pub fn rsavp1(public_key: &Rsa<Public>, signature: &BigNum) -> Result<BigNum, Er
     message.mod_exp(&signature, e, n, &mut bn_ctx)?;
     Ok(message)
 }
-
+/*
+/// MGF1 mask generation function based on the hash function hash as defined
+/// in (Section B.2.1 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017]
+///
+/// @arguments:
+///     mgfSeed: seed from which mask is generated, an octet string
+///     maskLen: intended length in octets of the mask; max length 2 ^ 32
+///
+/// @returns an octet string of length maskLen
+///
+pub fn mgf1(mgfSeed: &[u8], maskLen: usize, hLen: Option<usize>) -> Result<> {
+    if maskLen > u32::MAX + 1 {
+        panic()
+    }
+    let mut octet = [u8; maskLen];
+    if let Some(s) = hLen {
+        let l = (maskLen / hLen as u8);
+    } else {
+        let l = maskLen;
+    }
+    
+    for counter in 0..l {
+        let c = i20sp(counter, 4);
+        
+    }
+}
+*/
 #[cfg(test)]
 mod tests {
     #[test]
