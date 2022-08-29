@@ -41,7 +41,7 @@ use openssl::{
     //pkey::{Private, Public},
     hash::{Hasher, MessageDigest},
     rsa::Rsa,
-    pkey::{Private}
+    pkey::{Private, Public}
 };
 use bytes::BytesMut;
 
@@ -51,6 +51,7 @@ use primitives::{
     i20sp,
     os2ip,
     rsasp1,
+    rsavp1,
 };
 
 /// Cipher suites for VRF
@@ -80,7 +81,9 @@ impl VRF {
     ///
     /// @returns a VRF struct if successful
     ///
-    pub fn from_suite(suite: VRFCipherSuite) -> Result<Self, ErrorStack> {
+    pub fn from_suite(
+        suite: VRFCipherSuite
+    ) -> Result<Self, ErrorStack> {
         // Context for BigNum algebra
         let mut bn_ctx = BigNumContext::new()?;
 
@@ -106,7 +109,11 @@ impl VRF {
     ///
     /// @returns an octet string of length mask_len
     ///
-    pub fn mgf1(&mut self, mgf_seed: &[u8], mask_len: usize, hLen: Option<usize>) -> Result<Vec<u8>, ErrorStack> {
+    pub fn mgf1(&mut self, 
+        mgf_seed: &[u8], 
+        mask_len: usize, 
+        hLen: Option<usize>
+    ) -> Result<Vec<u8>, ErrorStack> {
         let max_len: usize = u32::MAX.try_into().unwrap();
         if mask_len > max_len + 1 {
             panic!()
@@ -144,7 +151,11 @@ impl VRF {
     ///
     /// @returns pi_string: proof, an octet string of length k
     ///
-    pub fn rsafdhvrf_prove(&mut self, secret_key: &Rsa<Private>, alpha_string: &[u8]) -> Result<Vec<u8>, ErrorStack> {
+    pub fn rsafdhvrf_prove(
+        &mut self, 
+        secret_key: &Rsa<Private>, 
+        alpha_string: &[u8]
+    ) -> Result<Vec<u8>, ErrorStack> {
         let one_string: u8 = 0x01;
         let mut n = secret_key.n().to_owned().unwrap();
         let k = &n.to_vec().len();
@@ -173,6 +184,72 @@ impl VRF {
 
         Ok(pi_string)
     }
+
+    /// RSA-FDH-VRF proof to hash algorithm as defined
+    /// in Section 4.2 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    /// @arguments:
+    ///     pi_string: proof, an octet string of length k
+    ///
+    /// @returns beta_string: VRF hash output, an octet string of length hLen
+    ///
+    pub fn rsafdhvrf_proof_to_hash(
+        &mut self, 
+        pi_string: &[u8]
+    ) -> Result<Vec<u8>, ErrorStack> {
+        let two_string: u8 = 0x02;
+        self.hasher.update(&[two_string]).unwrap();
+        self.hasher.update(pi_string).unwrap();
+        let beta_string = self.hasher.finish().unwrap().to_vec();
+
+        Ok(beta_string)
+    }
+
+    /// RSA-FDH-VRF verifying algorithm as defined
+    /// in Section 4.3 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    /// @arguments:
+    ///     public_key: RSA public key
+    ///     alpha_string: VRF hash input, an octet string
+    ///     pi_string: proof to be verified, an octet string of length n
+    ///
+    /// @returns beta_string: VRF hash output, an octet string of length hLen
+    ///
+    pub fn rsafdhvrf_verify(
+        &mut self, 
+        public_key: &Rsa<Public>, 
+        alpha_string: &[u8], 
+        pi_string: &[u8]
+    ) -> Result<Vec<u8>, ErrorStack> {
+        let s = os2ip(pi_string).unwrap();
+        let mut m = rsavp1(public_key, &s).unwrap();
+        
+        let mut n = public_key.n().to_owned().unwrap();
+        let k = &n.to_vec().len();
+
+        let em = i20sp(&mut m, *k - 1).unwrap();
+        let one_string: u8 = 0x01;
+
+        let mut sequence = BytesMut::new();
+        sequence.extend_from_slice(&[one_string]);
+
+        let mut num = BigNum::from_u32(*k as u32)?;
+        let i2 = i20sp(&mut num, 4).unwrap();
+        sequence.extend_from_slice(i2.as_slice());
+
+        let i3 = i20sp(&mut n, *k).unwrap();
+        sequence.extend_from_slice(i3.as_slice());
+
+        sequence.extend_from_slice(alpha_string);
+
+        let em_ = self.mgf1(&sequence, k - 1, None).unwrap();
+
+        if em == em_ {
+            Ok(self.rsafdhvrf_proof_to_hash(pi_string).unwrap())
+        } else {
+            panic!()
+        }
+    } 
 }
 
 #[cfg(test)]
