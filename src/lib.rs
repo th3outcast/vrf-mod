@@ -151,7 +151,7 @@ impl VRF {
     ///
     /// @returns pi_string: proof, an octet string of length k
     ///
-    pub fn rsafdhvrf_prove(
+    pub fn prove(
         &mut self, 
         secret_key: &Rsa<Private>, 
         alpha_string: &[u8]
@@ -193,7 +193,7 @@ impl VRF {
     ///
     /// @returns beta_string: VRF hash output, an octet string of length hLen
     ///
-    pub fn rsafdhvrf_proof_to_hash(
+    pub fn proof_to_hash(
         &mut self, 
         pi_string: &[u8]
     ) -> Result<Vec<u8>, ErrorStack> {
@@ -215,7 +215,7 @@ impl VRF {
     ///
     /// @returns beta_string: VRF hash output, an octet string of length hLen
     ///
-    pub fn rsafdhvrf_verify(
+    pub fn verify(
         &mut self, 
         public_key: &Rsa<Public>, 
         alpha_string: &[u8], 
