@@ -44,6 +44,10 @@ use openssl::{
     pkey::{Private, Public}
 };
 use bytes::BytesMut;
+use thiserror::Error;
+use std::{
+    os::raw::c_ulong,
+};
 
 mod primitives;
 
@@ -62,6 +66,36 @@ pub enum VRFCipherSuite {
     PKI_MGF_MGF1_SHA1,
     /// Set MGF hash function as SHA-256
     PKI_MGF_MGF1_SHA256
+}
+
+/// Error types that can be raised
+#[derive(Error, Debug)]
+pub enum Error {
+    /// Error raised from `openssl::error::ErrorStack` with a specific code
+    #[error("Error with code: {code:?}")]
+    CodedError { code: c_ulong },
+    /// The mask length is invalid
+    #[error("Invalid mask length")]
+    InvalidMaskLength,
+    /// The modulus length is invalid
+    #[error("Invalid modulus `n` length")]
+    InvalidModulusLength,
+    /// The proof is invalid
+    #[error("Invalid proof")]
+    InvalidProof,
+    /// Unknown error
+    #[error("Unknown error")]
+    Unknown,
+}
+
+impl From<ErrorStack> for Error {
+    /// Transform error from `openssl::error::ErrorStack` to `Error::CodedError` or `Error::Unknown`
+    fn from(error: ErrorStack) -> Self {
+        match error.errors().get(0).map(openssl::error::Error::code) {
+            Some(code) => Error::CodedError { code },
+            _ => Error::Unknown {},
+        }
+    }
 }
 
 pub struct VRF {
@@ -83,7 +117,7 @@ impl VRF {
     ///
     pub fn from_suite(
         suite: VRFCipherSuite
-    ) -> Result<Self, ErrorStack> {
+    ) -> Result<Self, Error> {
         // Context for BigNum algebra
         let mut bn_ctx = BigNumContext::new()?;
 
@@ -113,10 +147,10 @@ impl VRF {
         mgf_seed: &[u8], 
         mask_len: usize, 
         hLen: Option<usize>
-    ) -> Result<Vec<u8>, ErrorStack> {
+    ) -> Result<Vec<u8>, Error> {
         let max_len: usize = u32::MAX.try_into().unwrap();
         if mask_len > max_len + 1 {
-            panic!()
+            return Err(Error::InvalidMaskLength);
         }
         
         let mut octet = BytesMut::with_capacity(mask_len);
@@ -155,12 +189,13 @@ impl VRF {
         &mut self, 
         secret_key: &Rsa<Private>, 
         alpha_string: &[u8]
-    ) -> Result<Vec<u8>, ErrorStack> {
+    ) -> Result<Vec<u8>, Error> {
         let one_string: u8 = 0x01;
         let mut n = secret_key.n().to_owned().unwrap();
+        
         let k = &n.to_vec().len();
-        if !(*k < 4_294_967_295usize) {
-            panic!()
+        if !(*k < 4_294_967_296usize) {
+            return Err(Error::InvalidModulusLength);
         }
         
         // mgf1(one_string || i20sp(k, 4) || i20sp(n, k) || alpha_string, k - 1)
@@ -196,7 +231,7 @@ impl VRF {
     pub fn proof_to_hash(
         &mut self, 
         pi_string: &[u8]
-    ) -> Result<Vec<u8>, ErrorStack> {
+    ) -> Result<Vec<u8>, Error> {
         let two_string: u8 = 0x02;
         self.hasher.update(&[two_string]).unwrap();
         self.hasher.update(pi_string).unwrap();
@@ -220,7 +255,7 @@ impl VRF {
         public_key: &Rsa<Public>, 
         alpha_string: &[u8], 
         pi_string: &[u8]
-    ) -> Result<Vec<u8>, ErrorStack> {
+    ) -> Result<Vec<u8>, Error> {
         let s = os2ip(pi_string).unwrap();
         let mut m = rsavp1(public_key, &s).unwrap();
         
@@ -247,7 +282,7 @@ impl VRF {
         if em == em_ {
             Ok(self.proof_to_hash(pi_string).unwrap())
         } else {
-            panic!()
+            return Err(Error::InvalidProof);
         }
     } 
 }
