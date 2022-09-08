@@ -41,13 +41,14 @@ use openssl::{
     //pkey::{Private, Public},
     hash::{Hasher, MessageDigest},
     rsa::Rsa,
-    pkey::{Private, Public}
+    pkey::{Private, Public, HasPublic, HasPrivate}
 };
 use bytes::BytesMut;
 use thiserror::Error;
 use std::{
     os::raw::c_ulong,
 };
+use crate::VRF as VRF_trait;
 
 mod primitives;
 
@@ -175,6 +176,10 @@ impl VRF {
         }
         Ok(octet.to_vec())
     }
+}
+
+impl VRF_trait for VRF {
+    type Error = Error;
 
     /// RSA-FDH-VRF prooving algorithm as defined
     /// in Section 4.1 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
@@ -185,14 +190,14 @@ impl VRF {
     ///
     /// @returns pi_string: proof, an octet string of length k
     ///
-    pub fn prove(
+    fn prove(
         &mut self, 
         secret_key: &Rsa<Private>, 
         alpha_string: &[u8]
     ) -> Result<Vec<u8>, Error> {
         let one_string: u8 = 0x01;
         let mut n = secret_key.n().to_owned().unwrap();
-        
+
         let k = &n.to_vec().len();
         if !(*k < 4_294_967_296usize) {
             return Err(Error::InvalidModulusLength);
@@ -222,13 +227,13 @@ impl VRF {
 
     /// RSA-FDH-VRF proof to hash algorithm as defined
     /// in Section 4.2 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
-    ///
+    /// 
     /// @arguments:
     ///     pi_string: proof, an octet string of length k
     ///
     /// @returns beta_string: VRF hash output, an octet string of length hLen
     ///
-    pub fn proof_to_hash(
+    fn proof_to_hash(
         &mut self, 
         pi_string: &[u8]
     ) -> Result<Vec<u8>, Error> {
@@ -250,7 +255,7 @@ impl VRF {
     ///
     /// @returns beta_string: VRF hash output, an octet string of length hLen
     ///
-    pub fn verify(
+    fn verify(
         &mut self, 
         public_key: &Rsa<Public>, 
         alpha_string: &[u8], 

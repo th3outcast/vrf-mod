@@ -1,13 +1,17 @@
 //! # Verifiable Random Function
 //!
-//! This crate defines a generic contract that must be followed by VRF implementations.
+//! This crate defines a trait that must be implemented by VRFs.
 //!
+use openssl::{
+    rsa::Rsa,
+    pkey::{Public, Private}
+};
 
 pub mod vrf;
 
 /// A trait containing the common capabilities for VRF implementations
 ///
-pub trait VRF<PrivKey, PubKey> {
+pub trait VRF {
     type Error;
 
     /// Generates proof from a private key and a message
@@ -18,7 +22,7 @@ pub trait VRF<PrivKey, PubKey> {
     ///
     /// @returns if successful, a vector of octets representing the VRF proof
     ///
-    fn prove(&mut self, pkey: PrivKey, alpha_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
+    fn prove(&mut self, pkey: &Rsa<Private>, alpha_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 
     /// Generates VRF hash output from the provided proof
     ///
@@ -37,5 +41,5 @@ pub trait VRF<PrivKey, PubKey> {
     ///     pi_string: proof to be verified, an octet string
     /// 
     /// @returns if successful, a vector of octets with the VRF hash output
-    fn verify(&mut self, public_key: PubKey, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
+    fn verify(&mut self, public_key: &Rsa<Public>, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 }
