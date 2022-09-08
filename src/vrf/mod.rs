@@ -403,8 +403,31 @@ mod tests {
         assert_eq!(message, expected_message);
     }
 
+
     #[test]
-    fn test_mgf1() {
+    fn test_mgf1_sha1() {
+        let mut vrf = VRF::from_suite(VRFCipherSuite::PKI_MGF_MGF1_SHA1).unwrap();
+        let seed: &[u8; 32] = &[
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+        ];
+        let mask_len: usize = 32;
+
+        let mask = vrf.mgf1(seed, mask_len).unwrap();
+        let expected_mask = vec![
+            18, 71, 204, 28, 245, 187, 190, 206, 
+            148, 32, 216, 166, 247, 180, 135, 157, 
+            20, 48, 62, 183, 78, 20, 23, 68, 
+            203, 35, 17, 162, 222, 173, 133, 120
+        ];
+
+        assert_eq!(mask, expected_mask);
+    }
+
+    #[test]
+    fn test_mgf1_sha256() {
         let mut vrf = VRF::from_suite(VRFCipherSuite::PKI_MGF_MGF1_SHA256).unwrap();
         let seed: &[u8; 32] = &[
             0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
