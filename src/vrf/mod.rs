@@ -41,7 +41,7 @@ use openssl::{
     //pkey::{Private, Public},
     hash::{Hasher, MessageDigest},
     rsa::Rsa,
-    pkey::{Private, Public, HasPublic, HasPrivate}
+    pkey::{Private, Public}
 };
 use bytes::BytesMut;
 use thiserror::Error;
@@ -55,8 +55,6 @@ mod primitives;
 use primitives::{
     i20sp,
     os2ip,
-    rsasp1,
-    rsavp1,
 };
 
 /// Cipher suites for VRF
@@ -81,6 +79,9 @@ pub enum Error {
     /// The modulus length is invalid
     #[error("Invalid modulus `n` length")]
     InvalidModulusLength,
+    /// The modulus length is invalid
+    #[error("Invalid message `m` length")]
+    InvalidMessageLength,
     /// The proof is invalid
     #[error("Invalid proof")]
     InvalidProof,
@@ -105,7 +106,9 @@ pub struct VRF {
     // Ciphersuite identity
     cipher_suite: VRFCipherSuite,
     // Hasher structure
-    hasher: Hasher, //MessageDigest,
+    hasher: Hasher, 
+    // Length in bytes of hash function output
+    hlen: usize,
 }
 
 impl VRF {
@@ -120,19 +123,75 @@ impl VRF {
         suite: VRFCipherSuite
     ) -> Result<Self, Error> {
         // Context for BigNum algebra
-        let mut bn_ctx = BigNumContext::new()?;
+        let bn_ctx = BigNumContext::new()?;
 
-        // Hasher digest
-        let hasher = match suite {
-            VRFCipherSuite::PKI_MGF_MGF1_SHA1 => Hasher::new(MessageDigest::sha1())?,
-            VRFCipherSuite::PKI_MGF_MGF1_SHA256 => Hasher::new(MessageDigest::sha256())?,
+        // Set digest type
+        let digest_type = match suite {
+            VRFCipherSuite::PKI_MGF_MGF1_SHA1 => MessageDigest::sha1(),
+            VRFCipherSuite::PKI_MGF_MGF1_SHA256 => MessageDigest::sha256(),
         };
+
+        // Length in bytes of hash function output
+        let hlen = digest_type.size();
+
+        let hasher = Hasher::new(digest_type)?;
 
         Ok(VRF {
             bn_ctx,
             cipher_suite: suite,
             hasher,
+            hlen,
         })
+    }
+
+    /// RSASP1 signature primitive defined in
+    /// (Section 5.2.1 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.1]
+    ///
+    /// @arguments: 
+    ///     secret_key: Rsa private key
+    ///     message: BigNum message representation
+    ///
+    /// @returns a signature representative
+    ///
+    pub fn rsasp1(&mut self, 
+        secret_key: &Rsa<Private>, 
+        message: &BigNum
+    ) -> Result<BigNum, Error> {
+        let n = secret_key.n();
+        let d = secret_key.d();
+        let mut signature = BigNum::new()?;
+
+        if *message > (n - &BigNum::from_u32(1)?) && !message.is_negative() {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        signature.mod_exp(&message, d, n, &mut self.bn_ctx)?;
+        Ok(signature)
+    }
+
+    /// RSAVP1 verification primitive defined in
+    /// (Section 5.2.2 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.2]
+    /// 
+    /// @arguments:
+    ///     public_key: Rsa public key
+    ///     signature: signed message to extract
+    ///
+    /// @returns a BigNum representing the message extracted from the signature
+    ///
+    pub fn rsavp1(&mut self, 
+        public_key: &Rsa<Public>, 
+        signature: &BigNum
+    ) -> Result<BigNum, Error> {
+        let n = public_key.n();
+        let e = public_key.e();
+        let mut message = BigNum::new()?;
+
+        if *signature > (n - &BigNum::from_u32(1)?) && !signature.is_negative() {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        message.mod_exp(&signature, e, n, &mut self.bn_ctx)?;
+        Ok(message)
     }
 
     /// MGF1 mask generation function based on the hash function hash as defined
@@ -146,8 +205,7 @@ impl VRF {
     ///
     pub fn mgf1(&mut self, 
         mgf_seed: &[u8], 
-        mask_len: usize, 
-        hLen: Option<usize>
+        mask_len: usize
     ) -> Result<Vec<u8>, Error> {
         let max_len: usize = u32::MAX.try_into().unwrap();
         if mask_len > max_len + 1 {
@@ -155,12 +213,9 @@ impl VRF {
         }
         
         let mut octet = BytesMut::with_capacity(mask_len);
-        let mut iterations = mask_len;
         
-        // If hLen specified, shadow iterations
-        if let Some(s) = hLen {
-            iterations = &iterations / s;
-        }
+        // ceil (maskLen / hlen)
+        let iterations = mask_len / &self.hlen ;
     
         for counter in 0..iterations {
             let mut num = BigNum::from_u32(counter as u32)?;
@@ -217,9 +272,9 @@ impl VRF_trait for VRF {
 
         sequence.extend_from_slice(alpha_string);
 
-        let em = self.mgf1(&sequence, k - 1, None).unwrap();
+        let em = self.mgf1(&sequence, k - 1).unwrap();
         let m = os2ip(&em.as_slice()).unwrap();
-        let mut s = rsasp1(secret_key, &m).unwrap();
+        let mut s = self.rsasp1(secret_key, &m).unwrap();
         let pi_string = i20sp(&mut s, *k).unwrap();
 
         Ok(pi_string)
@@ -262,7 +317,7 @@ impl VRF_trait for VRF {
         pi_string: &[u8]
     ) -> Result<Vec<u8>, Error> {
         let s = os2ip(pi_string).unwrap();
-        let mut m = rsavp1(public_key, &s).unwrap();
+        let mut m = self.rsavp1(public_key, &s).unwrap();
         
         let mut n = public_key.n().to_owned().unwrap();
         let k = &n.to_vec().len();
@@ -282,7 +337,7 @@ impl VRF_trait for VRF {
 
         sequence.extend_from_slice(alpha_string);
 
-        let em_ = self.mgf1(&sequence, k - 1, None).unwrap();
+        let em_ = self.mgf1(&sequence, k - 1).unwrap();
 
         if em == em_ {
             Ok(self.proof_to_hash(pi_string).unwrap())
