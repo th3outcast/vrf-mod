@@ -214,8 +214,8 @@ impl VRF {
         
         let mut octet = BytesMut::with_capacity(mask_len);
         
-        // ceil (maskLen / hlen)
-        let iterations = mask_len / &self.hlen ;
+        // ceil (maskLen / hlen) -> (maskLen + hlen - 1) / hlen
+        let iterations = (mask_len + &self.hlen - 1) / &self.hlen ;
     
         for counter in 0..iterations {
             let mut num = BigNum::from_u32(counter as u32)?;
@@ -229,7 +229,8 @@ impl VRF {
             let digest = self.hasher.finish().unwrap().to_vec();
             octet.extend_from_slice(digest.as_slice());
         }
-        Ok(octet.to_vec())
+        // Output the leading octets
+        Ok(octet[0..mask_len].to_vec())
     }
 }
 
@@ -400,5 +401,27 @@ mod tests {
         let expected_message = BigNum::from_hex_str("7468697320697320612073616d706c65206d657373616765").unwrap();
     
         assert_eq!(message, expected_message);
+    }
+
+    #[test]
+    fn test_mgf1() {
+        let mut vrf = VRF::from_suite(VRFCipherSuite::PKI_MGF_MGF1_SHA256).unwrap();
+        let seed: &[u8; 32] = &[
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 
+        ];
+        let mask_len: usize = 32;
+
+        let mask = vrf.mgf1(seed, mask_len).unwrap();
+        let expected_mask = vec![
+            63, 108, 39, 36, 162, 26, 59, 41, 
+            239, 136, 106, 82, 170, 65, 75, 236, 
+            150, 196, 111, 122, 241, 55, 198, 54, 
+            6, 82, 9, 255, 137, 44, 238, 108
+        ];
+
+        assert_eq!(mask, expected_mask);
     }
 }
