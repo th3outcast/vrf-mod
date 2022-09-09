@@ -513,4 +513,72 @@ mod tests {
 
         assert_eq!(pi_string, expected_pi_string);
     }
+
+    #[test]
+    fn test_verify_sha1() {
+        let mut vrf = VRF::from_suite(VRFCipherSuite::PKI_MGF_MGF1_SHA1).unwrap();
+
+        let key = include_bytes!("../test/rsa.pem.pub");
+        let public_key = Rsa::public_key_from_pem(key).unwrap();
+
+        // hex encoded -> 'this is a sample message'
+        let alpha = hex::decode("7468697320697320612073616d706c65206d657373616765").unwrap();
+        let pi = hex::decode("\
+            6d8b0b748f637f3edc779981fd23ff07d10\
+            f573155f0473262116459310c4a4dde54df\
+            ced09bbfd437bbe776985073624c27ab594\
+            d166b674188b8b760928a4d32e6fdb2e61e\
+            6e51f7e2b10589a13d10bbf97285df54edb\
+            42675a685ea3063df7e3cce2f2c9329936a\
+            489e54168d47e78d5eeddf44e5db8bbe535\
+            0facf272c446a9a22872d382a10e0424c18\
+            6e0709915a33325362ebfbb6caa574877e8\
+            7af5c7a8054d9665055f04d094557887eee\
+            805b7c77f1d221b9d84ad5c8917a480558c\
+            49547d3531687eadd6020254d07949f0999\
+            a1b80a61abfccc4aa278d7fe525866aa2f4\
+            abe2b99083abd7c4ac2043de91e795b04c3\
+            9c76d90b07d0fcf6af6824").unwrap();
+        
+        let beta = vrf.verify(&public_key, &alpha, &pi).unwrap();
+        let expected_beta = hex::decode(
+            "3f996d9e247556eaf70518680fc4a9f40a566f52"
+        ).unwrap();
+
+        assert_eq!(beta, expected_beta);
+    }
+
+    #[test]
+    fn test_verify_sha256() {
+        let mut vrf = VRF::from_suite(VRFCipherSuite::PKI_MGF_MGF1_SHA256).unwrap();
+
+        let key = include_bytes!("../test/rsa.pem.pub");
+        let public_key = Rsa::public_key_from_pem(key).unwrap();
+
+        // hex encoded -> 'this is a sample message'
+        let alpha = hex::decode("7468697320697320612073616d706c65206d657373616765").unwrap();
+        let pi = hex::decode("\
+            6fd6d34a832b37a4ecf7efbb78526311792\
+            7ddd46c3fc1be34609a395916fa873d26ad\
+            d37c41ce275e66b394fb53bae084d7ef420\
+            cd64882e90d0c54303ca832845199d2fbe4\
+            b65aa7b7e350e96b23b9adc2cc4e982b26b\
+            d0d399820f47a7174b0ca09d60f115683fd\
+            c38f193698b215adc234313ad4706d07cf5\
+            a2db9c2eec0a0154d486ae20f7cb05d5ffa\
+            74502b352436e3d8952a093bfb10ef0dcf9\
+            7f68ae1e28fb0a26948cb12d826cdb7632e\
+            06e4f6321a0a4cc106b5d99e9471f53efdf\
+            c89d57fef14561745b08bebb3ef176aa41e\
+            7630cb7444cb0df27606a31917992b11e8d\
+            b2e3b3a5f7182d417cebaa7faa3afbfb575\
+            8e2259fa3cd8aaa86514b3").unwrap();
+        
+        let beta = vrf.verify(&public_key, &alpha, &pi).unwrap();
+        let expected_beta = hex::decode(
+            "440a1644d54afc1055f0fbb4c2ef0c3d67abd0e42978a7c196b9758a7340f5a8"
+        ).unwrap();
+
+        assert_eq!(beta, expected_beta);
+    }
 }
