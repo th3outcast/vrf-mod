@@ -9,11 +9,12 @@ use openssl::{
 /// Converts a non-negative BigNum integer to an octet string of specified length as 
 /// defined in [Section 4.1 of RFC8017](https://datatracker.ietf.org/doc/pdf/rfc8017#section-4.1)
 /// 
-/// @arguments:
-///     num: unsigned BigNum integer to be converted
-///     xlen: length of octet string to return
+/// # Arguments:
 ///
-/// @returns a vector representing the octet string in big-endian
+/// *    num: unsigned BigNum integer to be converted
+/// *    xlen: length of octet string to return
+///
+/// # returns a vector representing the octet string in big-endian
 ///
 pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
     // Set base 256
@@ -46,10 +47,10 @@ pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
 /// Converts an octet string to a non-negative BigNum integer as 
 /// defined in [Section 4.2 of RFC8017](https://datatracker.ietf.org/doc/pdf/rfc8017#section-4.2)
 /// 
-/// @arguments:
+/// # Arguments:
 ///     octet: slice representing octet string to be converted to a BigNum integer
 /// 
-/// @returns a non-negative BigNum integer
+/// # returns a non-negative BigNum integer
 ///
 pub fn os2ip(octet: &[u8]) -> Result<BigNum, ErrorStack> {
     let base = BigNum::from_u32(256)?;
