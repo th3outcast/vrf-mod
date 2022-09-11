@@ -5,40 +5,46 @@
 //! * [RFC6969](https://www.rfc-editor.org/rfc/rfc6979)
 //! * [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
 //!
-//! sk: the private key for the vrf
-//! pk: the public key for the vrf
-//! alpha: the input to be hashed by the vrf
-//! beta: the vrf hash output; 
+//! `sk`: the private key for the vrf
+//!
+//! `pk`: the public key for the vrf
+//!
+//! `alpha`: the input to be hashed by the vrf
+//!
+//! `beta`: the vrf hash output; 
 //!         beta = VRF_hash(sk, alpha)
-//! pi: the vrf proof; 
+//!
+//! `pi`: the vrf proof; 
 //!         pi = VRF_prove(sk, alpha)
-//! prover: the prover holds the private vrf key 'sk' and public vrf key 'pk'
-//! verifier: the verifier holds the public vrf key 'pk'
+//!
+//! `prover`: the prover holds the private vrf key 'sk' and public vrf key 'pk'
+//!
+//! `verifier`: the verifier holds the public vrf key 'pk'
 //!
 //! The prover generates beta and pi.
 //! 
 //! To deterministically obtain the vrf hash output beta directly from the proof pi:
 //! 
-//! beta = VRF_proof_to_hash(pi)
+//! `beta` = VRF_proof_to_hash(pi)
 //! 
-//! VRF_hash(sk, alpha) = VRF_proof_to_hash(VRF_prove(sk, alpha))
+//! `VRF_hash(sk, alpha)` = VRF_proof_to_hash(VRF_prove(sk, alpha))
 //!
 //! pi allows a verifier holding the public key pk to verify the correctness of beta as the vrf hash of the input alpha under key pk
 //! 
-//! Verfication:
-//!     VRF_verfify(pk, alpha, pi)
-//! Output if valid:
-//!     (valid, beta = VRF_proof_to_hash(pi)) 
+//! # Verfication:
+//! *    VRF_verify(pk, alpha, pi)
+//!
+//! # Output if valid:
+//! *    (valid, beta = VRF_proof_to_hash(pi)) 
 //!
 //! ## Features
 //!
 //! * Compute VRF proof
 //! * Verify VRF proof
+//!
 use openssl::{
     bn::{BigNum, BigNumContext},
     error::ErrorStack,
-    //rsa::Rsa,
-    //pkey::{Private, Public},
     hash::{Hasher, MessageDigest},
     rsa::Rsa,
     pkey::{Private, Public}
@@ -114,10 +120,11 @@ pub struct VRF {
 impl VRF {
     /// Associated function to initialize a VRF structure with an initialized context for the given cipher suite.
     ///
-    /// @arguments:
-    ///     suite: Identifying ciphersuite
+    /// # Arguments:
     ///
-    /// @returns a VRF struct if successful
+    /// *    `suite`: Identifying ciphersuite
+    ///
+    /// # returns a VRF struct if successful
     ///
     pub fn from_suite(
         suite: VRFCipherSuite
@@ -145,13 +152,14 @@ impl VRF {
     }
 
     /// RSASP1 signature primitive defined in
-    /// (Section 5.2.1 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.1]
+    /// [Section 5.2.1 of \[RFC8017\]](https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.1)
     ///
-    /// @arguments: 
-    ///     secret_key: Rsa private key
-    ///     message: BigNum message representation
+    /// # Arguments: 
     ///
-    /// @returns a signature representative
+    /// *    `secret_key`: Rsa private key
+    /// *    `message`: BigNum message representation
+    ///
+    /// # returns a signature representative
     ///
     pub fn rsasp1(&mut self, 
         secret_key: &Rsa<Private>, 
@@ -170,13 +178,14 @@ impl VRF {
     }
 
     /// RSAVP1 verification primitive defined in
-    /// (Section 5.2.2 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.2]
+    /// [Section 5.2.2 of \[RFC8017\]](https://datatracker.ietf.org/doc/pdf/rfc8017#section-5.2.2)
     /// 
-    /// @arguments:
-    ///     public_key: Rsa public key
-    ///     signature: signed message to extract
+    /// # Arguments:
     ///
-    /// @returns a BigNum representing the message extracted from the signature
+    /// *    `public_key`: Rsa public key
+    /// *    `signature`: signed message to extract
+    ///
+    /// # returns a BigNum representing the message extracted from the signature
     ///
     pub fn rsavp1(&mut self, 
         public_key: &Rsa<Public>, 
@@ -195,13 +204,14 @@ impl VRF {
     }
 
     /// MGF1 mask generation function based on the hash function hash as defined
-    /// in (Section B.2.1 of [RFC8017])[https://datatracker.ietf.org/doc/pdf/rfc8017]
+    /// in [Section B.2.1 of \[RFC8017\]](https://datatracker.ietf.org/doc/pdf/rfc8017)
     ///
-    /// @arguments:
-    ///     mgf_seed: seed from which mask is generated, an octet string
-    ///     mask_len: intended length in octets of the mask; max length 2 ^ 32
+    /// # Arguments:
     ///
-    /// @returns an octet string of length mask_len
+    /// *    `mgf_seed`: seed from which mask is generated, an octet string
+    /// *    `mask_len`: intended length in octets of the mask; max length 2 ^ 32
+    ///
+    /// # returns an octet string of length mask_len
     ///
     pub fn mgf1(&mut self, 
         mgf_seed: &[u8], 
@@ -240,11 +250,12 @@ impl VRF_trait for VRF {
     /// RSA-FDH-VRF prooving algorithm as defined
     /// in Section 4.1 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
     ///
-    /// @arguments:
-    ///     secret_key: RSA private key
-    ///     alpha_string: VRF hash input, an octet string
+    /// # Arguments:
     ///
-    /// @returns pi_string: proof, an octet string of length k
+    /// *    `secret_key`: RSA private key
+    /// *    `alpha_string`: VRF hash input, an octet string
+    ///
+    /// # returns `pi_string`: proof, an octet string of length k
     ///
     fn prove(
         &mut self, 
@@ -284,10 +295,11 @@ impl VRF_trait for VRF {
     /// RSA-FDH-VRF proof to hash algorithm as defined
     /// in Section 4.2 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
     /// 
-    /// @arguments:
-    ///     pi_string: proof, an octet string of length k
+    /// # Arguments:
     ///
-    /// @returns beta_string: VRF hash output, an octet string of length hLen
+    /// *    `pi_string`: proof, an octet string of length k
+    ///
+    /// # returns `beta_string`: VRF hash output, an octet string of length hLen
     ///
     fn proof_to_hash(
         &mut self, 
@@ -304,12 +316,13 @@ impl VRF_trait for VRF {
     /// RSA-FDH-VRF verifying algorithm as defined
     /// in Section 4.3 of [VRF-draft-05](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
     ///
-    /// @arguments:
-    ///     public_key: RSA public key
-    ///     alpha_string: VRF hash input, an octet string
-    ///     pi_string: proof to be verified, an octet string of length n
+    /// # Arguments:
     ///
-    /// @returns beta_string: VRF hash output, an octet string of length hLen
+    /// *    `public_key`: RSA public key
+    /// *    `alpha_string`: VRF hash input, an octet string
+    /// *    `pi_string`: proof to be verified, an octet string of length n
+    ///
+    /// # returns beta_string: VRF hash output, an octet string of length hLen
     ///
     fn verify(
         &mut self, 
