@@ -18,6 +18,9 @@ use openssl::{
     ec::{EcGroup, EcPoint, PointConversionForm},
 };
 use thiserror::Error;
+use std::{
+    os::raw::c_ulong,
+};
 use crate::VRF;
 
 mod primitives;
@@ -37,6 +40,30 @@ impl CipherSuite {
         match *self {
             CipherSuite::P256_SHA256_TAI => 0x01,
             CipherSuite::SECP256k1_SHA256_TAI => 0xFE,
+        }
+    }
+}
+
+/// Error types that can be raised
+#[derive(Error, Debug)]
+pub enum Error {
+    /// Error raised from `openssl::error::ErrorStack` with a specific code
+    #[error("Error with code: {code:?}")]
+    CodedError { code: c_ulong },
+    /// `hash_to_point()` function could not find a valid point
+    #[error("Hash to point function could not find a valid point")]
+    HashToPointError,
+    /// Unknown error
+    #[error("Unknown error")]
+    Unknown,
+}
+
+impl From<ErrorStack> for Error {
+    /// Transform error from `openssl::error::ErrorStack` to `Error::CodedError` or `Error::Unknown`
+    fn from(error: ErrorStack) -> Self {
+        match error.errors().get(0).map(openssl::error::Error::code) {
+            Some(code) => Error::CodedError { code },
+            _ => Error::Unknown {},
         }
     }
 }
