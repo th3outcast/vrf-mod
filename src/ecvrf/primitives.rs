@@ -14,7 +14,7 @@ use openssl::{
 /// * `num`: an octet slice representing the number to be converted
 /// * `qlen`: the length of the output `BigNum`
 ///
-/// # returns
+/// # returns a `BigNum` representing the conversion.
 ///
 pub fn bits2ints(
     num: &[u8],
@@ -38,13 +38,22 @@ pub fn bits2ints(
 ///
 /// # Arguments
 ///
-/// * ``:
-/// * ``:
+/// * `num`: an octet slice
+/// * `length`: transform input `num` to a sequence of `length`
+/// * `order`: right output boundary non-inclusive, output lies in range = (0, order)
+/// * `bn_ctx`: `BigNumContext` for arithmetic
 ///
-/// # returns
+/// # returns a vector of octets
 ///
 pub fn bits2octets(
-
-) -> Result<> {
-
+    num: &[u8],
+    length: usize,
+    order: &BigNum,
+    bn_ctx: &mut BigNumContext,
+) -> Result<Vec<u8>, ErrorStack> {
+    let z1 = bits2ints(num, length);
+    let mut z2 = BigNum::new().and_then(|mut result| {
+        result.nnmod(&z1, order, bn_ctx)?;
+        Ok(result.to_vec()) 
+    })?;
 }
