@@ -15,7 +15,7 @@
 use openssl::{
     bn::{BigNum, BigNumContext},
     error::ErrorStack,
-    ec::{EcGroup, EcPoint},
+    ec::{EcGroup, EcPoint, PointConversionForm},
 };
 use thiserror::Error;
 use crate::VRF;
@@ -32,6 +32,15 @@ pub enum CipherSuite {
     SECP256k1_SHA256_TAI,
 }
 
+impl CipherSuite {
+    fn suite_string(&self) -> u8 {
+        match *self {
+            CipherSuite::P256_SHA256_TAI => 0x01,
+            CipherSuite::SECP256k1_SHA256_TAI => 0xFE,
+        }
+    }
+}
+
 // Elliptical Curve VRF
 pub struct ECVRF {
     // BigNum arithmetic context
@@ -42,12 +51,14 @@ pub struct ECVRF {
     hasher: Hasher, 
     // Length in bytes of hash function output
     hlen: usize,
+    // Elliptical Curve group
+    group: EcGroup,
     // Finite field
     field:
     // Length in octets of a field element in F, rounded up to nearest integer
     len:
     // Elliptical Curve defined over the finite field
-    ec:
+    group:
     // Subgroup of `ec` of large prime order
     subgroup:
     // Prime order of group G
@@ -95,6 +106,55 @@ impl ECVRF {
         public_key: &EcPoint,
         alpha_string: &[u8],
     ) -> Result<EcPoint, Error> {
-        
+        let mut counter = 0..255;
+        let pk_string = public_key.to_bytes(
+            &self.group,
+            PointConversionForm::COMPRESSED,
+            &mut self.bn_ctx,
+        )?;
+        // Hash(suite_string || one_string || pk_string || alpha_string || ctr_string)
+        let mut cipher = [self.cipher_suite.suite_string(), 0x01, &pk_string, alpha_string, 0x00].concat();
+        let last = cipher.len() - 1;
+        let mut point = counter.find_map(|ctr| {
+            cipher[last] = ctr;
+            self.hasher.update(&cipher).unwrap();
+            let hash_attempt = self.hasher.finish().unwrap().to_vec();
+            let h = self.arbitrary_string_to_point();
+            // Check the validity of 'H'
+            match h {
+                Ok(hash_point) => Some(hash_point),
+                _ => None,
+            }
+        });
+        // Set H = cofactor * H
+        if let Some(pt) = point.as_mut() {
+            let mut new_point = EcPoint::new(&self.group)?;
+            new_point.mul(
+                &self.group,
+                pt,
+                &BigNum::from_slice(&[self.cofactor])?,
+                &self.bn_ctx,
+            )?;
+            *pt = new_point;
+        };
+        // Convert point or error if no valid point found
+        point.ok_or(Error::HashToPointError)
+    }
+
+    /// Converts an arbitrary string to a point in the curve as specified in [Section 5.5 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `data`: a 32 octet string to be converted to a point
+    ///
+    /// # returns an `EcPoint` representing the converted point if successful
+    ///
+    pub fn arbitrary_string_to_point(
+        &mut self,
+        data: &[u8],
+    ) -> Result<EcPoint, Error> {
+        let mut v = [0x02, data].concat();
+        let point = EcPoint::from_bytes(&self.group, &v, &mut self.bn_ctx)?;
+        Ok(point)
     }
 }
