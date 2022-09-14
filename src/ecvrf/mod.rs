@@ -21,9 +21,15 @@ use thiserror::Error;
 use std::{
     os::raw::c_ulong,
 };
+use hmac_sha256::HMAC;
 use crate::VRF;
 
 mod primitives;
+use primitives::{
+    bits2ints,
+    bits2octets,
+    append_zeroes,
+};
 
 // Cipher suite types for different curves
 #[allow(non_camel_case_types)]
@@ -80,6 +86,12 @@ pub struct ECVRF {
     hlen: usize,
     // Elliptical Curve group
     group: EcGroup,
+    // Prime order of `group`
+    order:
+    // Length of `order` in octets i.e smallest integer such that 2^(8*qlen)>order
+    qlen:
+
+    /*
     // Finite field
     field:
     // Length in octets of a field element in F, rounded up to nearest integer
@@ -90,12 +102,11 @@ pub struct ECVRF {
     subgroup:
     // Prime order of group G
     q: 
-    // Length of q in octets i.e smallest integer such that 2^(8*qlen)>q
-    qlen:
     // Number of points on `ec` divided by q
     cofactor:
     // Generator of group G
-    gen: 
+    gen:
+    */ 
 }
 
 impl ECVRF {
@@ -192,14 +203,65 @@ impl ECVRF {
     /// * `secret key`: a BigNum representing the secret key.
     /// * `data`: a slice of octets representing the message
     ///
+    /// # returns a `BigNum` representing the nonce.
+    ///
     pub fn generate_nonce(
         &mut self,
+        secret_key: &BigNum,
+        data: &[u8]
     ) -> Result<> {
         // h1 = H(m)
-        self.hasher.update(&cipher).unwrap();
+        self.hasher.update(data).unwrap();
         let h1 = self.hasher.finish().unwrap().to_vec();
 
+        // Initialize `V` and `K`
         let mut v = [0x01; 32];
         let mut k = [0x00; 32];
+
+        // private key in the [1, qlen -1] range, should be a multiple of 8; left pad with zeroes (if neccessary)
+        // ints2octets(private_key)
+        let padded_secret_key = append_zeroes(&secret_key.to_vec(), self.qlen);
+
+        // bits2octets(h1)
+        let data = bits2octets(
+            &h1, self.qlen, &self.order, &mut self.bn_ctx,
+        )?;
+        let padded_data = append_zeroes(&data, self.qlen);
+
+        // 2 rounds of hashing as specified
+        for prefix in 0..2u8 {
+            k = HMAC::mac(
+                [
+                    &v[..],
+                    &[prefix],
+                    &padded_secret_key.as_slice(),
+                    &padded_data.as_slice(),
+                ]
+                .concat(),
+                &k,
+            );
+            v = HMAC::mac(&v, &k);
+        }
+
+        // Loop until a valid `BigNum` nonce is found in `V`
+        loop {
+            v = HMAC::mac(&v, &k);
+
+            let nonce = bits2ints(&v)?;
+
+            if nonce > BigNum::from_u32(0)? && nonce < self.order {
+                return Ok(nonce);
+            }
+
+            k = HMAC::mac(
+                [
+                    &v,
+                    &[0x00],
+                ]
+                .concat(),
+                &k,
+            );
+            v = HMAC::mac(&v, &k);
+        }
     }
 }
