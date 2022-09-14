@@ -57,3 +57,30 @@ pub fn bits2octets(
         Ok(result.to_vec()) 
     })?;
 }
+
+/// Appends zeroes if provided slice is smaller than given length in bits
+///
+/// # Arguments
+/// 
+/// * `data`: octet slice
+/// * `length`: size in bits after appending zeroes
+///
+/// # returns a vector of octets with leading zeroes (if necessary) 
+///
+pub fn append_zeroes(
+    data: &[u8],
+    length: usize,
+) -> Vec<u8> {
+    // Check if data length does not exceed provided transform length
+    if data.len() * 8 > length {
+        return data.to_vec();
+    }
+
+    let zeroes = if length % 8 > 0 {
+        vec![0; length / 8 - data.len() + 1]
+    } else {
+        vec![0; length / 8 - data.len()]
+    };
+
+    [&zeroes.as_slice(), data].concat()
+}
