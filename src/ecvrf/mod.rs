@@ -90,6 +90,8 @@ pub struct ECVRF {
     order:
     // Length of `order` in octets i.e smallest integer such that 2^(8*qlen)>order
     qlen:
+    // 2n - length in octets of a field element in bits, rounded up to the nearest even integer
+    n:
 
     /*
     // Finite field
@@ -263,5 +265,39 @@ impl ECVRF {
             );
             v = HMAC::mac(&v, &k);
         }
+    }
+
+    /// Hashes a slice of EC points to a `BigNum` integer as specified in [Section 5.4.3 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    /// # Arguments
+    ///
+    /// * `points`: a slice of points that need to be hashed
+    ///
+    /// # returns a `BigNum` integer (0 < x < 2^(8n) - 1) representing the hash of points truncated to length `n`, if successful.
+    ///
+    pub fn hash_points(
+        points: &[EcPoint],
+    ) -> Result<BigNum, Error> {
+        let concatenate_points: <Vec<u8> = points.iter().try_fold(
+            vec![self.cipher_suite.suite_string(), 0x02],
+            |mut acc, point| {
+                let sequence: Vec<u8> = point.to_bytes(
+                    &self.group,
+                    PointConversionForm::COMPRESSED,
+                    &mut self.bn_ctx,
+                )?;
+
+                acc.extend(sequence);
+                Ok(acc)
+            }
+        )?;
+
+        self.hasher.update(&concatenate_points.as_slice()).unwrap();
+        let hash_string = self.hasher.finish().unwrap().to_vec();
+
+        let truncated_hash_string = hash_string[0..self.n / 8];
+        let result = BigNum::from_slice(truncated_hash_string)?;
+
+        Ok(result)
     }
 }
