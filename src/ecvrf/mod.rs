@@ -184,4 +184,22 @@ impl ECVRF {
         let point = EcPoint::from_bytes(&self.group, &v, &mut self.bn_ctx)?;
         Ok(point)
     }
+
+    /// Generates a nonce deterministically from the algorithm specified in [Section 3.2 RFC6979](https://tools.ietf.org/html/rfc6979)
+    ///
+    /// # Arguments
+    ///
+    /// * `secret key`: a BigNum representing the secret key.
+    /// * `data`: a slice of octets representing the message
+    ///
+    pub fn generate_nonce(
+        &mut self,
+    ) -> Result<> {
+        // h1 = H(m)
+        self.hasher.update(&cipher).unwrap();
+        let h1 = self.hasher.finish().unwrap().to_vec();
+
+        let mut v = [0x01; 32];
+        let mut k = [0x00; 32];
+    }
 }
