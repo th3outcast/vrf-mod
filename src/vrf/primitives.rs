@@ -48,7 +48,8 @@ pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
 /// defined in [Section 4.2 of RFC8017](https://datatracker.ietf.org/doc/pdf/rfc8017#section-4.2)
 /// 
 /// # Arguments:
-///     octet: slice representing octet string to be converted to a BigNum integer
+///
+/// *    `octet`: slice representing octet string to be converted to a BigNum integer
 /// 
 /// # returns a non-negative BigNum integer
 ///
