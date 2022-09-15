@@ -211,7 +211,7 @@ impl ECVRF {
         &mut self,
         secret_key: &BigNum,
         data: &[u8]
-    ) -> Result<> {
+    ) -> Result<BigNum, Error> {
         // h1 = H(m)
         self.hasher.update(data).unwrap();
         let h1 = self.hasher.finish().unwrap().to_vec();
@@ -300,4 +300,108 @@ impl ECVRF {
 
         Ok(result)
     }
+
+    /// Function to derive public key given a private key point.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key`: a `BigNum` representing the private key
+    ///
+    /// # returns an `EcPoint` representing the public key, if successful
+    ///
+    pub fn derive_public_key_point(
+        &mut self, 
+        private_key: &BigNum
+    ) -> Result<EcPoint, Error> {
+        let mut point = EcPoint::new(&self.group)?;
+        // public_key = private_key * generator
+        point.mul_generator(&self.group, private_key, &self.bn_ctx)?;
+        Ok(point)
+    }
+}
+
+impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
+    type Error = Error;
+
+    /// Generates proof from a private key and a message as specified in [Section 5.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05) 
+    ///
+    /// # Arguments:
+    ///
+    /// *    `pkey`: a private key
+    /// *    `alpha_string`: octet string message represented by a slice
+    ///
+    /// # returns if successful, a vector of octets representing the proof `pi_string`
+    ///
+    fn prove(
+        &mut self, 
+        pkey: &[u8], 
+        alpha_string: &[u8],
+    ) -> Result<Vec<u8>, Self::Error> {
+        // 1. Derive public key Y
+        // Y = x * B
+        let private_key = BigNum::from_slice(pkey)?;
+        let public_key = self.derive_public_key_point(&private_key)?;
+
+        // 2. H = hash_to_curve(suite_string, public_key, alpha_string)
+        let h = self.hash_to_try_and_increment(&public_key, alpha_string)?;
+
+        // 3. h_string = point_to_string(H)
+        let h_string = h.to_bytes(
+            &self.group,
+            PointConversionForm::COMPRESSED,
+            &mut bn_ctx,
+        )?;
+
+        // 4. Gamma = x * H
+        let mut gamma = EcPoint::new(&self.group)?;
+        gamma.mul(&self.group, &h, &private_key, self.bn_ctx)?;
+
+        // 5. nonce_generation(private_key, h_string)
+        let nonce = self.generate_nonce(&private_key, &h_string)?;
+
+        // 6. c = hash_points(H, Gamma, k*B, k*H)
+        let mut kb = EcPoint::new(&self.group)?;
+        kb.mul_generator(&self.group, &nonce, &self.bn_ctx)?;
+        let mut kh = EcPoint::new(&self.group)?;
+        kh.mul(&self.group, &h, &nonce, &self.bn_ctx)?;
+        let c = self.hash_points(&[&h, &gamma, &kb, &kh])?;
+
+        // 7. s = (k + c*x) mod q
+        let s = &(&nonce + &c * &private_key) % &self.order;
+
+        // 8. pi_string = point_to_string(gamma) || int_to_string(c, n) || int_to_string(s, qlen)
+        let gamma_string = gamma.to_bytes(
+            &self.group,
+            PointConversionForm::COMPRESSED,
+            &mut bn_ctx,
+        )?;
+        let c_string = append_zeroes(&c.to_vec(), self.n)?;
+        let s_string = append_zeroes(&s.to_vec(), self.qlen)?;
+        let pi_string = [&gamma_string.as_slice(), c_string.as_slice(), s_string.as_slice()].concat()
+
+        // 9. Output pi_string
+        Ok(pi_string)
+    }
+
+    /// Generates VRF hash output from the provided proof
+    ///
+    /// # Arguments:
+    ///
+    /// *    `pi_string`: generated VRF proof
+    ///
+    /// # returns the VRF hash output
+    ///
+    fn proof_to_hash(&mut self, pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
+
+    /// Verifies the provided VRF proof and computes the VRF hash output
+    ///
+    /// # Arguments:
+    ///
+    /// *    `public_key`: a public key
+    /// *    `alpha_string`: VRF hash input, an octet string
+    /// *    `pi_string`: proof to be verified, an octet string
+    /// 
+    /// # returns if successful, a vector of octets with the VRF hash output
+    ///
+    fn verify(&mut self, public_key: PublicKey, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 }
