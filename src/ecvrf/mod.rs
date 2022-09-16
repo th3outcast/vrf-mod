@@ -88,16 +88,16 @@ pub struct ECVRF {
     cipher_suite: CipherSuite,
     // Hasher structure
     hasher: Hasher, 
-    // Length in bytes of hash function output
-    hlen: usize,
     // Elliptical Curve group
     group: EcGroup,
     // Prime order of `group`
-    order:
+    order: BigNum,
     // Length of `order` in octets i.e smallest integer such that 2^(8*qlen)>order
-    qlen:
+    qlen: usize,
     // 2n - length in octets of a field element in bits, rounded up to the nearest even integer
-    n:
+    n: usize,
+    // Number of points on the elliptical curve divided by `order`
+    cofactor: u8,
 
     /*
     // Finite field
@@ -136,6 +136,33 @@ impl ECVRF {
             CipherSuite::P256_SHA256_TAI => (EcGroup::from_curve_name(Nid::X9_62_PRIME256V1)?, 0x01),
             CipherSuite::SECP256k1_SHA256_TAI => (EcGroup::from_curve_name(Nid::SECP256K1)?, 0x01),
         };
+
+        let mut p = BigNum::new()?;
+        let mut a = BigNum::new()?;
+        let mut b = BigNum::new()?;
+        group.components_gfps(&mut p, &mut a, &mut b, &mut bn_ctx)?;
+
+        let mut order = BigNum::new()?;
+        group.order(&mut order, &mut bn_ctx)?;
+
+        let n = ((p.num_bits() + (p.num_bits() % 2)) / 2) as usize;
+        let qlen = order.num_bits() as usize;
+
+        // Digest type - `sha256`
+        let hasher = Hasher::new(MessageDigest::sha256())?;
+
+        Ok(
+            ECVRF {
+                bn_ctx,
+                cipher_suite:,
+                hasher,
+                group,
+                order,
+                qlen,
+                n,
+                cofactor,
+            }
+        )
     }
 
     /// ECVRF_hash_to_curve implementation as specified in [Section 5.4.1.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
