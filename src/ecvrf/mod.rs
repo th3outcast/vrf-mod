@@ -16,13 +16,15 @@ use openssl::{
     bn::{BigNum, BigNumContext},
     error::ErrorStack,
     ec::{EcGroup, EcPoint, PointConversionForm},
+    nid::Nid,
+    hash::{Hasher, MessageDigest},
 };
 use thiserror::Error;
 use std::{
     os::raw::c_ulong,
 };
 use hmac_sha256::HMAC;
-use crate::VRF;
+use crate::ECVRF as ECVRF_trait;
 
 mod primitives;
 use primitives::{
@@ -98,23 +100,6 @@ pub struct ECVRF {
     n: usize,
     // Number of points on the elliptical curve divided by `order`
     cofactor: u8,
-
-    /*
-    // Finite field
-    field:
-    // Length in octets of a field element in F, rounded up to nearest integer
-    len:
-    // Elliptical Curve defined over the finite field
-    group:
-    // Subgroup of `ec` of large prime order
-    subgroup:
-    // Prime order of group G
-    q: 
-    // Number of points on `ec` divided by q
-    cofactor:
-    // Generator of group G
-    gen:
-    */ 
 }
 
 impl ECVRF {
@@ -140,7 +125,7 @@ impl ECVRF {
         let mut p = BigNum::new()?;
         let mut a = BigNum::new()?;
         let mut b = BigNum::new()?;
-        group.components_gfps(&mut p, &mut a, &mut b, &mut bn_ctx)?;
+        group.components_gfp(&mut p, &mut a, &mut b, &mut bn_ctx)?;
 
         let mut order = BigNum::new()?;
         group.order(&mut order, &mut bn_ctx)?;
@@ -154,7 +139,7 @@ impl ECVRF {
         Ok(
             ECVRF {
                 bn_ctx,
-                cipher_suite:,
+                cipher_suite: suite,
                 hasher,
                 group,
                 order,
@@ -186,13 +171,13 @@ impl ECVRF {
             &mut self.bn_ctx,
         )?;
         // Hash(suite_string || one_string || pk_string || alpha_string || ctr_string)
-        let mut cipher = [self.cipher_suite.suite_string(), 0x01, &pk_string, alpha_string, 0x00].concat();
+        let mut cipher = [&[self.cipher_suite.suite_string()], &[0x01], pk_string.as_slice(), alpha_string, &[0x00]].concat();
         let last = cipher.len() - 1;
         let mut point = counter.find_map(|ctr| {
             cipher[last] = ctr;
             self.hasher.update(&cipher).unwrap();
             let hash_attempt = self.hasher.finish().unwrap().to_vec();
-            let h = self.arbitrary_string_to_point();
+            let h = self.arbitrary_string_to_point(&hash_attempt);
             // Check the validity of 'H'
             match h {
                 Ok(hash_point) => Some(hash_point),
@@ -205,7 +190,7 @@ impl ECVRF {
             new_point.mul(
                 &self.group,
                 pt,
-                &BigNum::from_slice(&[self.cofactor])?,
+                BigNum::from_slice(&[self.cofactor])?.as_ref(),
                 &self.bn_ctx,
             )?;
             *pt = new_point;
@@ -226,7 +211,7 @@ impl ECVRF {
         &mut self,
         data: &[u8],
     ) -> Result<EcPoint, Error> {
-        let mut v = [0x02, data].concat();
+        let v = [&[0x02], data].concat();
         let point = EcPoint::from_bytes(&self.group, &v, &mut self.bn_ctx)?;
         Ok(point)
     }
@@ -282,7 +267,7 @@ impl ECVRF {
         loop {
             v = HMAC::mac(&v, &k);
 
-            let nonce = bits2ints(&v)?;
+            let nonce = bits2ints(&v, self.qlen)?;
 
             if nonce > BigNum::from_u32(0)? && nonce < self.order {
                 return Ok(nonce);
@@ -290,7 +275,7 @@ impl ECVRF {
 
             k = HMAC::mac(
                 [
-                    &v,
+                    &v[..],
                     &[0x00],
                 ]
                 .concat(),
@@ -309,9 +294,10 @@ impl ECVRF {
     /// # returns a `BigNum` integer (0 < x < 2^(8n) - 1) representing the hash of points truncated to length `n`, if successful.
     ///
     pub fn hash_points(
-        points: &[EcPoint],
+        &mut self,
+        points: &[&EcPoint],
     ) -> Result<BigNum, Error> {
-        let concatenate_points: <Vec<u8> = points.iter().try_fold(
+        let concatenate_points: Result<Vec<u8>, Error> = points.iter().try_fold(
             vec![self.cipher_suite.suite_string(), 0x02],
             |mut acc, point| {
                 let sequence: Vec<u8> = point.to_bytes(
@@ -323,13 +309,13 @@ impl ECVRF {
                 acc.extend(sequence);
                 Ok(acc)
             }
-        )?;
+        );
 
-        self.hasher.update(&concatenate_points.as_slice()).unwrap();
-        let hash_string = self.hasher.finish().unwrap().to_vec();
+        self.hasher.update(&concatenate_points?.as_slice()).unwrap();
+        let mut hash_string = self.hasher.finish().unwrap().to_vec();
+        hash_string.truncate(self.n / 8);
 
-        let truncated_hash_string = hash_string[0..self.n / 8];
-        let result = BigNum::from_slice(truncated_hash_string)?;
+        let result = BigNum::from_slice(hash_string.as_slice())?;
 
         Ok(result)
     }
@@ -378,21 +364,21 @@ impl ECVRF {
             self.n / 8 + 1
         } else {
             self.n / 8
-        }
+        };
 
         // Expected length of proof: len(pi_string) == len(gamma) + len(c) + len(s)
         // len(s) == 2 * len(c), so len(pi) == len(gamma) + len(c) * 3
-        if pi.len() != pt_len + c_len * 3 {
+        if pi_string.len() != pt_len + c_len * 3 {
             return Err(Error::InvalidPiLength);
         }
 
         let gamma = EcPoint::from_bytes(
             &self.group,
-            pi_string[0..pt_len],
+            &pi_string[0..pt_len],
             &mut self.bn_ctx,
         )?;
-        let c = BigNum::from_slice(&[pt_len..pt_len + c_len])?;
-        let s = BigNum::from_slice(&[pt_len + c_len..])?;
+        let c = BigNum::from_slice(&pi_string[pt_len..pt_len + c_len])?;
+        let s = BigNum::from_slice(&pi_string[pt_len + c_len..])?;
         Ok((gamma, c, s))
     }
 }
@@ -426,12 +412,12 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         let h_string = h.to_bytes(
             &self.group,
             PointConversionForm::COMPRESSED,
-            &mut bn_ctx,
+            &mut self.bn_ctx,
         )?;
 
         // 4. Gamma = x * H
         let mut gamma = EcPoint::new(&self.group)?;
-        gamma.mul(&self.group, &h, &private_key, self.bn_ctx)?;
+        gamma.mul(&self.group, &h, &private_key, &self.bn_ctx)?;
 
         // 5. nonce_generation(private_key, h_string)
         let nonce = self.generate_nonce(&private_key, &h_string)?;
@@ -444,17 +430,17 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         let c = self.hash_points(&[&h, &gamma, &kb, &kh])?;
 
         // 7. s = (k + c*x) mod q
-        let s = &(&nonce + &c * &private_key) % &self.order;
+        let s = &(&nonce + &(&c * &private_key)) % &self.order;
 
         // 8. pi_string = point_to_string(gamma) || int_to_string(c, n) || int_to_string(s, qlen)
         let gamma_string = gamma.to_bytes(
             &self.group,
             PointConversionForm::COMPRESSED,
-            &mut bn_ctx,
+            &mut self.bn_ctx,
         )?;
-        let c_string = append_zeroes(&c.to_vec(), self.n)?;
-        let s_string = append_zeroes(&s.to_vec(), self.qlen)?;
-        let pi_string = [&gamma_string.as_slice(), c_string.as_slice(), s_string.as_slice()].concat()
+        let c_string = append_zeroes(&c.to_vec(), self.n);
+        let s_string = append_zeroes(&s.to_vec(), self.qlen);
+        let pi_string = [&gamma_string.as_slice(), c_string.as_slice(), s_string.as_slice()].concat();
 
         // 9. Output pi_string
         Ok(pi_string)
@@ -474,21 +460,21 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         &mut self, 
         pi_string: &[u8]
     ) -> Result<Vec<u8>, Error> {
-        let (gamma, c, s) = self.decode_proof(pi_string)?;
+        let (gamma, _, _) = self.decode_proof(pi_string)?;
 
         // cofactor * Gamma
-        let gamma_ = EcPoint::new(&self.group)?;
+        let mut gamma_ = EcPoint::new(&self.group)?;
         gamma_.mul(
             &self.group,
             &gamma,
-            &BigNum::from_slice(&[self.cofactor])?,
+            BigNum::from_slice(&[self.cofactor])?.as_ref(),
             &self.bn_ctx,
         )?;
 
         let gamma_bytes = gamma_.to_bytes(
             &self.group,
             PointConversionForm::COMPRESSED,
-            &mut bn_ctx,
+            &mut self.bn_ctx,
         )?;
 
         let cipher = [
@@ -535,13 +521,13 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         )?;
 
         // 3. U = s*B - c*Y
-        let sb = EcPoint::new(&self.group)?;
+        let mut sb = EcPoint::new(&self.group)?;
         sb.mul_generator(
             &self.group,
             &s,
             &self.bn_ctx,
         )?;
-        let cy = EcPoint::new(&self.group)?;
+        let mut cy = EcPoint::new(&self.group)?;
         cy.mul(
             &self.group,
             &public_key_point,
@@ -549,7 +535,7 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
             &self.bn_ctx,
         )?;
         cy.invert(&self.group, &self.bn_ctx)?;
-        let u_point = EcPoint::new(&self.group)?;
+        let mut u_point = EcPoint::new(&self.group)?;
         u_point.add(
             &self.group,
             &sb,
@@ -558,14 +544,14 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         )?;
 
         // 4. V = s*H - c*Gamma
-        let sh = EcPoint::new(&self.group)?;
+        let mut sh = EcPoint::new(&self.group)?;
         sh.mul(
             &self.group,
             &hash_point,
             &s,
             &self.bn_ctx,
         )?;
-        let c_gamma = EcPoint::new(&self.group)?;
+        let mut c_gamma = EcPoint::new(&self.group)?;
         c_gamma.mul(
             &self.group,
             &gamma,
@@ -573,7 +559,7 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
             &self.bn_ctx,
         )?;
         c_gamma.invert(&self.group, &self.bn_ctx)?;
-        let v_point = EcPoint::new(&self.group)?;
+        let mut v_point = EcPoint::new(&self.group)?;
         v_point.add(
             &self.group,
             &sh,
@@ -586,14 +572,14 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
             &[
                 &hash_point, 
                 &gamma, 
-                &u, 
-                &v
+                &u_point, 
+                &v_point,
             ]
         )?;
 
         // 6. Validity check
         if c == derived_c {
-            Ok(self.proof_to_hash(pi_string))
+            Ok(self.proof_to_hash(pi_string)?)
         } else {
             return Err(Error::InvalidProof);
         }

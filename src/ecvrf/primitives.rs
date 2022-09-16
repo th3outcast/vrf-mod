@@ -51,11 +51,12 @@ pub fn bits2octets(
     order: &BigNum,
     bn_ctx: &mut BigNumContext,
 ) -> Result<Vec<u8>, ErrorStack> {
-    let z1 = bits2ints(num, length);
-    let mut z2 = BigNum::new().and_then(|mut result| {
+    let z1 = bits2ints(num, length)?;
+    let z2 = BigNum::new().and_then(|mut result| {
         result.nnmod(&z1, order, bn_ctx)?;
         Ok(result.to_vec()) 
     })?;
+    Ok(z2)
 }
 
 /// Appends zeroes if provided slice is smaller than given length in bits

@@ -48,7 +48,7 @@ pub trait VRF {
     fn verify(&mut self, public_key: &Rsa<Public>, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 }
 
-//pub mod ecvrf;
+pub mod ecvrf;
 
 /// A trait containing common capabilities for ECVRF implementations
 ///

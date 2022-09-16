@@ -46,8 +46,8 @@ use openssl::{
     bn::{BigNum, BigNumContext},
     error::ErrorStack,
     hash::{Hasher, MessageDigest},
-    rsa::{Rsa, RsaRef},
-    pkey::{Private, Public, HasPrivate, HasPublic}
+    rsa::{Rsa},
+    pkey::{Private, Public}
 };
 use bytes::BytesMut;
 use thiserror::Error;
