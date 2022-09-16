@@ -59,6 +59,9 @@ pub enum Error {
     /// `hash_to_point()` function could not find a valid point
     #[error("Hash to point function could not find a valid point")]
     HashToPointError,
+    /// Invalid pi length
+    #[error("Proof(pi) length is invalid")]
+    InvalidPiLength,
     /// Unknown error
     #[error("Unknown error")]
     Unknown,
@@ -318,6 +321,50 @@ impl ECVRF {
         point.mul_generator(&self.group, private_key, &self.bn_ctx)?;
         Ok(point)
     }
+
+    /// Function to decode a proof `pi_string` produced by `EC_prove`, to (`gamma`, `c`, `s`) as specified in
+    /// [Section 5.4.4 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    /// # Arguments
+    ///
+    /// * `pi_string`: a slice of octets representing the generated proof
+    ///
+    /// # Returns 
+    ///
+    /// * `gamma`: an `EcPoint`
+    /// * `c`: integer between 0 and 2 ^ (8n) - 1
+    /// * `s`: integer between 0 and 2 ^ (8qlen) - 1
+    ///
+    pub fn decode_proof(
+        &mut self,
+        pi_string: &[u8],
+    ) -> Result<(EcPoint, BigNum, BigNum), Error> {
+        let pt_len = if self.qlen % 8 > 0 {
+            self.qlen / 8 + 2
+        } else {
+            self.qlen / 8 + 1
+        };
+        let c_len = if self.n % 8 > 0 {
+            self.n / 8 + 1
+        } else {
+            self.n / 8
+        }
+
+        // Expected length of proof: len(pi_string) == len(gamma) + len(c) + len(s)
+        // len(s) == 2 * len(c), so len(pi) == len(gamma) + len(c) * 3
+        if pi.len() != pt_len + c_len * 3 {
+            return Err(Error::InvalidPiLength);
+        }
+
+        let gamma = EcPoint::from_bytes(
+            &self.group,
+            pi_string[0..pt_len],
+            &mut self.bn_ctx,
+        )?;
+        let c = BigNum::from_slice(&[pt_len..pt_len + c_len])?;
+        let s = BigNum::from_slice(&[pt_len + c_len..])?;
+        Ok((gamma, c, s))
+    }
 }
 
 impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
@@ -336,7 +383,7 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         &mut self, 
         pkey: &[u8], 
         alpha_string: &[u8],
-    ) -> Result<Vec<u8>, Self::Error> {
+    ) -> Result<Vec<u8>, Error> {
         // 1. Derive public key Y
         // Y = x * B
         let private_key = BigNum::from_slice(pkey)?;
@@ -383,15 +430,46 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         Ok(pi_string)
     }
 
-    /// Generates VRF hash output from the provided proof
+    /// Generates ECVRF hash output from the provided proof
     ///
     /// # Arguments:
     ///
-    /// *    `pi_string`: generated VRF proof
+    /// *    `pi_string`: generated ECVRF proof
     ///
-    /// # returns the VRF hash output
+    /// # returns the ECVRF hash output
     ///
-    fn proof_to_hash(&mut self, pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
+    fn proof_to_hash(
+        &mut self, 
+        pi_string: &[u8]
+    ) -> Result<Vec<u8>, Error> {
+        let (gamma, c, s) = self.decode_proof(pi_string)?;
+
+        // cofactor * Gamma
+        let gamma_ = EcPoint::new(&self.group)?;
+        gamma_.mul(
+            &self.group,
+            &gamma,
+            &BigNum::from_slice(&[self.cofactor])?,
+            &self.bn_ctx,
+        )?;
+
+        let gamma_bytes = gamma_.to_bytes(
+            &self.group,
+            PointConversionForm::COMPRESSED,
+            &mut bn_ctx,
+        )?;
+
+        let cipher = [
+            &[self.cipher_suite.suite_string()],
+            &[0x03],
+            gamma_bytes.as_slice(),
+        ].concat();
+
+        self.hasher.update(&cipher).unwrap();
+        let beta_string = self.hasher.finish().unwrap().to_vec();
+
+        Ok(beta_string)
+    }
 
     /// Verifies the provided VRF proof and computes the VRF hash output
     ///
