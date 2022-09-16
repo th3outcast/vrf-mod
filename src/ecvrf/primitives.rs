@@ -85,3 +85,44 @@ pub fn append_zeroes(
 
     [&zeroes.as_slice(), data].concat()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_bits2ints() {
+        let octets = &[0x01; 33];
+        let data = BigNum::from_slice(octets).unwrap();
+    
+        let result = bits2ints(octets, 256).unwrap();
+        let mut expected_result = BigNum::new().unwrap();
+        expected_result.rshift(&data, 8).unwrap();
+
+        assert_eq!(result.to_vec(), expected_result.to_vec());
+    }
+
+    #[test]
+    fn test_bits2octets() {
+        // hex-encoded -> 'this is a sample string'
+        let data = hex::decode("7468697320697320612073616d706c65206d657373616765")
+            .unwrap();
+        let order_ = hex::decode("020000000000000000000b2e3b3a5f7182d417ceba").unwrap();
+        let order = BigNum::from_slice(&order_.as_slice()).unwrap();
+        let mut bn_ctx = BigNumContext::new().unwrap();
+        let result = bits2octets(
+            &data.as_slice(),
+            order.num_bits() as usize,
+            &order,
+            &mut bn_ctx,
+        )
+        .unwrap();
+
+        let expected_result = [
+            1, 209, 161, 165, 204, 129, 165, 204, 129, 132, 
+            129, 205, 133, 181, 193, 177, 148, 129, 181, 149, 205
+        ];
+
+        assert_eq!(result, expected_result);
+    }
+}

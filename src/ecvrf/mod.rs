@@ -26,7 +26,7 @@ use std::{
 use hmac_sha256::HMAC;
 use crate::ECVRF as ECVRF_trait;
 
-mod primitives;
+pub mod primitives;
 use primitives::{
     bits2ints,
     bits2octets,
