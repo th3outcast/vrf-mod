@@ -62,6 +62,9 @@ pub enum Error {
     /// Invalid pi length
     #[error("Proof(pi) length is invalid")]
     InvalidPiLength,
+    /// Invalid proof
+    #[error("Proof(pi) is invalid")]
+    InvalidProof,
     /// Unknown error
     #[error("Unknown error")]
     Unknown,
@@ -436,7 +439,9 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
     ///
     /// *    `pi_string`: generated ECVRF proof
     ///
-    /// # returns the ECVRF hash output
+    /// # Returns 
+    ///
+    /// * `beta_string`: the ECVRF hash output
     ///
     fn proof_to_hash(
         &mut self, 
@@ -475,11 +480,95 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
     ///
     /// # Arguments:
     ///
-    /// *    `public_key`: a public key
+    /// *    `public_key`: a slice representing the public key in octets
     /// *    `alpha_string`: VRF hash input, an octet string
     /// *    `pi_string`: proof to be verified, an octet string
     /// 
     /// # returns if successful, a vector of octets with the VRF hash output
     ///
-    fn verify(&mut self, public_key: PublicKey, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
+    fn verify(
+        &mut self, 
+        public_key: &[u8], 
+        alpha_string: &[u8], 
+        pi_string: &[u8]
+    ) -> Result<Vec<u8>, Error> {
+        // 1. Decode proof
+        let (gamma, c, s) = self.decode_proof(pi_string)?;
+
+        let public_key_point = EcPoint::from_bytes(
+            &self.group,
+            public_key,
+            &mut self.bn_ctx,
+        )?;
+
+        // 2. ECVRF_hash_to_curve(suite_string, y, alpha_string)
+        let hash_point = self.hash_to_try_and_increment(
+            &public_key_point,
+            alpha_string,
+        )?;
+
+        // 3. U = s*B - c*Y
+        let sb = EcPoint::new(&self.group)?;
+        sb.mul_generator(
+            &self.group,
+            &s,
+            &self.bn_ctx,
+        )?;
+        let cy = EcPoint::new(&self.group)?;
+        cy.mul(
+            &self.group,
+            &public_key_point,
+            &c,
+            &self.bn_ctx,
+        )?;
+        cy.invert(&self.group, &self.bn_ctx)?;
+        let u_point = EcPoint::new(&self.group)?;
+        u_point.add(
+            &self.group,
+            &sb,
+            &cy,
+            &mut self.bn_ctx,
+        )?;
+
+        // 4. V = s*H - c*Gamma
+        let sh = EcPoint::new(&self.group)?;
+        sh.mul(
+            &self.group,
+            &hash_point,
+            &s,
+            &self.bn_ctx,
+        )?;
+        let c_gamma = EcPoint::new(&self.group)?;
+        c_gamma.mul(
+            &self.group,
+            &gamma,
+            &c,
+            &self.bn_ctx,
+        )?;
+        c_gamma.invert(&self.group, &self.bn_ctx)?;
+        let v_point = EcPoint::new(&self.group)?;
+        v_point.add(
+            &self.group,
+            &sh,
+            &c_gamma,
+            &mut self.bn_ctx,
+        )?;
+
+        // 5. c' = ECVRF_hash_points(H, Gamma, U, V)
+        let derived_c = self.hash_points(
+            &[
+                &hash_point, 
+                &gamma, 
+                &u, 
+                &v
+            ]
+        )?;
+
+        // 6. Validity check
+        if c == derived_c {
+            Ok(self.proof_to_hash(pi_string))
+        } else {
+            return Err(Error::InvalidProof);
+        }
+    }
 }
