@@ -82,8 +82,19 @@ mod tests {
 
     #[test]
     fn i20sp_test() {
-        let mut result = BigNum::from_hex_str("0123456789abcde").unwrap();
-        let result = i20sp(&mut result, 8).unwrap();
-        //assert_eq!(result, 5);
+        let mut result = BigNum::from_dec_str("234567817231231").unwrap();
+        let result = i20sp(&mut result, 6).unwrap();
+
+        let expected_result = vec![213, 86, 147, 107, 251, 127];
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn os2ip_test() {
+        let mut octets = vec![213, 86, 147, 107, 251, 127];
+        let result = os2ip(&octets).unwrap();
+
+        let expected_result = BigNum::from_dec_str("234567817231231").unwrap();
+        assert_eq!(result, expected_result);
     }
 }
