@@ -716,4 +716,41 @@ mod tests {
         
         assert_eq!(result_nonce.to_vec(), expected_result);
     }
+
+    /// Test vector for hash points with `P256-SHA256-TAI` cipher suite
+    /// [Section A.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    #[test]
+    fn test_hash_points() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        // Test data
+        let hash_hex = hex::decode("02e2e1ab1b9f5a8a68fa4aad597e7493095648d3473b213bba120fe42d1a595f3e").unwrap();
+        let pi_hex = hex::decode("029bdca4cc39e57d97e2f42f88bcf0ecb1120fb67eb408a856050dbfbcbf57c524347fc46ccd87843ec0a9fdc090a407c6fbae8ac1480e240c58854897eabbc3a7bb61b201059f89186e7175af796d65e7").unwrap();
+        
+        // Compute all required points (gamma, u, v)
+        let hash_point = EcPoint::from_bytes(&ecvrf.group, &hash_hex, &mut ecvrf.bn_ctx).unwrap();
+        let mut gamma_hex = pi_hex.clone();
+        let c_s_hex = gamma_hex.split_off(33);
+        let gamma_point = EcPoint::from_bytes(&ecvrf.group, &gamma_hex, &mut ecvrf.bn_ctx).unwrap();
+        let u_hex = hex::decode("030286d82c95d54feef4d39c000f8659a5ce00a5f71d3a888bd1b8e8bf07449a50").unwrap();
+        let u_point = EcPoint::from_bytes(&ecvrf.group, &u_hex, &mut ecvrf.bn_ctx).unwrap();
+        let v_hex = hex::decode("03e4258b4a5f772ed29830050712fa09ea8840715493f78e5aaaf7b27248efc216").unwrap();
+        let v_point = EcPoint::from_bytes(&ecvrf.group, &v_hex, &mut ecvrf.bn_ctx).unwrap();
+
+        let computed_c = ecvrf.hash_points(
+            &[
+                &hash_point, 
+                &gamma_point, 
+                &u_point, 
+                &v_point
+            ]
+        ).unwrap();
+
+        let mut expected_c = c_s_hex.clone();
+        
+        expected_c.truncate(16);
+        
+        assert_eq!(computed_c.to_vec(), expected_c);
+    }
 }
