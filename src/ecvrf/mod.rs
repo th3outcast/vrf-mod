@@ -775,4 +775,36 @@ mod tests {
         assert!(derived_c.eq(&expected_c));
         assert!(expected_gamma.eq(&ecvrf.group, &derived_gamma, &mut ecvrf.bn_ctx).unwrap());
     }
+
+    /// Test for `P256-SHA256-TAI` cipher suite
+    /// 
+    #[test]
+    fn test_prove_p256_sha256_tai() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+        // private key
+        let x = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
+        
+        let alpha = hex::decode("73616d706c65").unwrap();
+
+        let pi = ecvrf.prove(&x, &alpha).unwrap();
+        let expected_pi = hex::decode("029bdca4cc39e57d97e2f42f88bcf0ecb1120fb67eb408a856050dbfbcbf57c524347fc46ccd87843ec0a9fdc090a407c6fbae8ac1480e240c58854897eabbc3a7bb61b201059f89186e7175af796d65e7").unwrap();
+        
+        assert_eq!(pi, expected_pi);
+    }
+
+    /// Test for `SECP256K1-SHA256-TAI` cipher suite
+    /// 
+    #[test]
+    fn test_prove_secp256k1_sha256_tai() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::SECP256k1_SHA256_TAI).unwrap();
+        // private key
+        let x = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
+        
+        let alpha = hex::decode("73616d706c65").unwrap();
+
+        let pi = ecvrf.prove(&x, &alpha).unwrap();
+        let expected_pi = hex::decode("031f4dbca087a1972d04a07a779b7df1caa99e0f5db2aa21f3aecc4f9e10e85d08748c9fbe6b95d17359707bfb8e8ab0c93ba0c515333adcb8b64f372c535e115ccf66ebf5abe6fadb01b5efb37c0a0ec9").unwrap();
+        
+        assert_eq!(pi, expected_pi);
+    }
 }
