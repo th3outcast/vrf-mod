@@ -109,7 +109,9 @@ impl ECVRF {
     ///
     /// *    `suite`: Identifying ciphersuite
     ///
-    /// # returns a ECVRF struct if successful
+    /// # Returns:
+    ///
+    /// *    a ECVRF struct if successful
     ///
     pub fn from_suite(
         suite: CipherSuite
@@ -157,7 +159,9 @@ impl ECVRF {
     /// * `public_key`: an Elliptical Curve point
     /// * `alpha_string`: value to be hashed, an octet string
     ///
-    /// # returns a finite EC point in G
+    /// # Returns:
+    ///
+    /// * a finite EC point in G
     ///
     pub fn hash_to_try_and_increment(
         &mut self,
@@ -223,7 +227,9 @@ impl ECVRF {
     /// * `secret key`: a BigNum representing the secret key.
     /// * `data`: a slice of octets representing the message
     ///
-    /// # returns a `BigNum` representing the nonce.
+    /// # Returns:
+    ///
+    /// * a `BigNum` representing the nonce.
     ///
     pub fn generate_nonce(
         &mut self,
@@ -291,7 +297,9 @@ impl ECVRF {
     ///
     /// * `points`: a slice of points that need to be hashed
     ///
-    /// # returns a `BigNum` integer (0 < x < 2^(8n) - 1) representing the hash of points truncated to length `n`, if successful.
+    /// # Returns:
+    ///
+    /// * a `BigNum` integer (0 < x < 2^(8n) - 1) representing the hash of points truncated to length `n`, if successful.
     ///
     pub fn hash_points(
         &mut self,
@@ -393,7 +401,9 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
     /// *    `pkey`: a private key
     /// *    `alpha_string`: octet string message represented by a slice
     ///
-    /// # returns if successful, a vector of octets representing the proof `pi_string`
+    /// # Returns:
+    ///
+    /// *    if successful, a vector of octets representing the proof `pi_string`
     ///
     fn prove(
         &mut self, 
@@ -497,7 +507,9 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
     /// *    `alpha_string`: VRF hash input, an octet string
     /// *    `pi_string`: proof to be verified, an octet string
     /// 
-    /// # returns if successful, a vector of octets with the VRF hash output
+    /// # Returns:
+    ///
+    /// *    if successful, a vector of octets with the VRF hash output
     ///
     fn verify(
         &mut self, 

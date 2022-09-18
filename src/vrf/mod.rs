@@ -124,7 +124,9 @@ impl VRF {
     ///
     /// *    `suite`: Identifying ciphersuite
     ///
-    /// # returns a VRF struct if successful
+    /// # Returns:
+    ///
+    /// *    a VRF struct if successful
     ///
     pub fn from_suite(
         suite: VRFCipherSuite
@@ -159,7 +161,9 @@ impl VRF {
     /// *    `secret_key`: Rsa private key
     /// *    `message`: BigNum message representation
     ///
-    /// # returns a signature representative
+    /// # Returns:
+    ///
+    /// *    a signature representative
     ///
     pub fn rsasp1(&mut self, 
         secret_key: &Rsa<Private>, 
@@ -185,7 +189,9 @@ impl VRF {
     /// *    `public_key`: Rsa public key
     /// *    `signature`: signed message to extract
     ///
-    /// # returns a BigNum representing the message extracted from the signature
+    /// # Returns: 
+    ///
+    /// *    a BigNum representing the message extracted from the signature
     ///
     pub fn rsavp1(&mut self, 
         public_key: &Rsa<Public>, 
@@ -211,7 +217,9 @@ impl VRF {
     /// *    `mgf_seed`: seed from which mask is generated, an octet string
     /// *    `mask_len`: intended length in octets of the mask; max length 2 ^ 32
     ///
-    /// # returns an octet string of length mask_len
+    /// # Returns: 
+    ///
+    /// *    an octet string of length mask_len
     ///
     pub fn mgf1(&mut self, 
         mgf_seed: &[u8], 
@@ -255,7 +263,9 @@ impl VRF_trait for VRF {
     /// *    `secret_key`: RSA private key
     /// *    `alpha_string`: VRF hash input, an octet string
     ///
-    /// # returns `pi_string`: proof, an octet string of length k
+    /// # Returns:
+    ///
+    /// *    `pi_string`: proof, an octet string of length k
     ///
     fn prove(
         &mut self, 
@@ -299,7 +309,9 @@ impl VRF_trait for VRF {
     ///
     /// *    `pi_string`: proof, an octet string of length k
     ///
-    /// # returns `beta_string`: VRF hash output, an octet string of length hLen
+    /// # Returns:
+    /// 
+    /// *    `beta_string`: VRF hash output, an octet string of length hLen
     ///
     fn proof_to_hash(
         &mut self, 
@@ -322,7 +334,9 @@ impl VRF_trait for VRF {
     /// *    `alpha_string`: VRF hash input, an octet string
     /// *    `pi_string`: proof to be verified, an octet string of length n
     ///
-    /// # returns beta_string: VRF hash output, an octet string of length hLen
+    /// # Returns:
+    ///
+    /// *   `beta_string`: VRF hash output, an octet string of length hLen
     ///
     fn verify(
         &mut self, 

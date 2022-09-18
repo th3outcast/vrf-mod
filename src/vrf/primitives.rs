@@ -14,7 +14,9 @@ use openssl::{
 /// *    num: unsigned BigNum integer to be converted
 /// *    xlen: length of octet string to return
 ///
-/// # returns a vector representing the octet string in big-endian
+/// # Returns: 
+///
+/// *   a vector representing the octet string in big-endian
 ///
 pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
     // Set base 256
@@ -51,7 +53,9 @@ pub fn i20sp(num: &mut BigNum, xlen: usize) -> Result<Vec<u8>, ErrorStack> {
 ///
 /// *    `octet`: slice representing octet string to be converted to a BigNum integer
 /// 
-/// # returns a non-negative BigNum integer
+/// # Returns:
+///
+/// *    a non-negative BigNum integer
 ///
 pub fn os2ip(octet: &[u8]) -> Result<BigNum, ErrorStack> {
     let base = BigNum::from_u32(256)?;

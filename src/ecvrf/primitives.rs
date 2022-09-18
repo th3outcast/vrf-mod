@@ -14,7 +14,9 @@ use openssl::{
 /// * `num`: an octet slice representing the number to be converted
 /// * `qlen`: the length of the output `BigNum`
 ///
-/// # returns a `BigNum` representing the conversion.
+/// # Returns:
+///
+/// * a `BigNum` representing the conversion.
 ///
 pub fn bits2ints(
     num: &[u8],
@@ -43,7 +45,9 @@ pub fn bits2ints(
 /// * `order`: right output boundary non-inclusive, output lies in range = (0, order)
 /// * `bn_ctx`: `BigNumContext` for arithmetic
 ///
-/// # returns a vector of octets
+/// # Returns:
+///
+/// * a vector of octets
 ///
 pub fn bits2octets(
     num: &[u8],
@@ -66,7 +70,9 @@ pub fn bits2octets(
 /// * `data`: octet slice
 /// * `length`: size in bits after appending zeroes
 ///
-/// # returns a vector of octets with leading zeroes (if necessary) 
+/// # Returns: 
+///
+/// * a vector of octets with leading zeroes (if necessary) 
 ///
 pub fn append_zeroes(
     data: &[u8],
