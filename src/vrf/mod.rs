@@ -110,7 +110,7 @@ pub struct VRF {
     // BigNum arithmetic context
     bn_ctx: BigNumContext,
     // Ciphersuite identity
-    cipher_suite: VRFCipherSuite,
+    _cipher_suite: VRFCipherSuite,
     // Hasher structure
     hasher: Hasher, 
     // Length in bytes of hash function output
@@ -145,7 +145,7 @@ impl VRF {
 
         Ok(VRF {
             bn_ctx,
-            cipher_suite: suite,
+            _cipher_suite: suite,
             hasher,
             hlen,
         })
