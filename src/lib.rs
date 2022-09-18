@@ -21,7 +21,9 @@ pub trait VRF {
     /// *    `pkey`: a private key
     /// *    `alpha_string`: octet string message represented by a slice
     ///
-    /// # returns if successful, a vector of octets representing the VRF proof
+    /// # Returns:
+    ///
+    /// *    if successful, a vector of octets representing the VRF proof
     ///
     fn prove(&mut self, pkey: &Rsa<Private>, alpha_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 
@@ -31,7 +33,9 @@ pub trait VRF {
     ///
     /// *    `pi_string`: generated VRF proof
     ///
-    /// # returns the VRF hash output
+    /// # Returns:
+    ///
+    /// *    the VRF hash output
     ///
     fn proof_to_hash(&mut self, pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 
@@ -43,7 +47,9 @@ pub trait VRF {
     /// *    `alpha_string`: VRF hash input, an octet string
     /// *    `pi_string`: proof to be verified, an octet string
     /// 
-    /// # returns if successful, a vector of octets with the VRF hash output
+    /// # Returns:
+    ///
+    /// *    if successful, a vector of octets with the VRF hash output
     ///
     fn verify(&mut self, public_key: &Rsa<Public>, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 }
@@ -62,7 +68,9 @@ pub trait ECVRF<PrivateKey, PublicKey> {
     /// *    `pkey`: a private key
     /// *    `alpha_string`: octet string message represented by a slice
     ///
-    /// # returns if successful, a vector of octets representing the VRF proof
+    /// # Returns:
+    ///
+    /// *    if successful, a vector of octets representing the VRF proof
     ///
     fn prove(&mut self, pkey: PrivateKey, alpha_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 
@@ -72,7 +80,9 @@ pub trait ECVRF<PrivateKey, PublicKey> {
     ///
     /// *    `pi_string`: generated VRF proof
     ///
-    /// # returns the VRF hash output
+    /// # Returns:
+    ///
+    /// *    the VRF hash output
     ///
     fn proof_to_hash(&mut self, pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 
@@ -84,7 +94,9 @@ pub trait ECVRF<PrivateKey, PublicKey> {
     /// *    `alpha_string`: VRF hash input, an octet string
     /// *    `pi_string`: proof to be verified, an octet string
     /// 
-    /// # returns if successful, a vector of octets with the VRF hash output
+    /// # Returns:
+    ///
+    /// *    if successful, a vector of octets with the VRF hash output
     ///
     fn verify(&mut self, public_key: PublicKey, alpha_string: &[u8], pi_string: &[u8]) -> Result<Vec<u8>, Self::Error>;
 }
