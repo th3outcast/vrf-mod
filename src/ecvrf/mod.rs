@@ -328,13 +328,15 @@ impl ECVRF {
         Ok(result)
     }
 
-    /// Function to derive public key given a private key point.
+    /// Function to derive public key point given a private key.
     ///
     /// # Arguments
     ///
     /// * `private_key`: a `BigNum` representing the private key
     ///
-    /// # returns an `EcPoint` representing the public key, if successful
+    /// # Returns:
+    ///
+    /// * an `EcPoint` representing the public key, if successful
     ///
     pub fn derive_public_key_point(
         &mut self, 
@@ -344,6 +346,30 @@ impl ECVRF {
         // public_key = private_key * generator
         point.mul_generator(&self.group, private_key, &self.bn_ctx)?;
         Ok(point)
+    }
+
+    /// Function to derive public key given a private key.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key`: a slice of octets representing the private key
+    ///
+    /// # Returns:
+    ///
+    /// * an slice of octets representing the public key, if successful
+    ///
+    pub fn derive_public_key(
+        &mut self, 
+        private_key: &[u8]
+    ) -> Result<Vec<u8>, Error> {
+        let private_key_bn = BigNum::from_slice(private_key)?;
+        let point = self.derive_public_key_point(&private_key_bn)?;
+        let public_key_bytes = point.to_bytes(
+            &self.group,
+            PointConversionForm::COMPRESSED,
+            &mut self.bn_ctx,
+        )?;
+        Ok(public_key_bytes)
     }
 
     /// Function to decode a proof `pi_string` produced by `EC_prove`, to (`gamma`, `c`, `s`) as specified in
