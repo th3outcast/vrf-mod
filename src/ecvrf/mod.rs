@@ -651,7 +651,7 @@ mod tests {
     fn test_hash_to_try_and_increment_3() {
         let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
 
-        // hex encoded -> 'test'
+        // hex encoded -> 'Example of ECDSA with ansip256r1 and SHA-256'
         let alpha = hex::decode("4578616d706c65206f66204543445341207769746820616e736970323536723120616e64205348412d323536").unwrap();
 
         let hex_public_key = hex::decode("03596375e6ce57e0f20294fc46bdfcfd19a39f8161b58695b3ec5b3d16427c274d").unwrap();
@@ -669,5 +669,51 @@ mod tests {
         let expected_result = hex::decode("02141e41d4d55802b0e3adaba114c81137d95fd3869b6b385d4487b1130126648d").unwrap();
 
         assert_eq!(result_bytes, expected_result);
+    }
+
+    /// Test vector for `P-256` curve with `SHA-256` as specified in
+    /// [Section A.2.5 \[RFC6979\]](https://tools.ietf.org/html/rfc6979)
+    ///
+    #[test]
+    fn test_generate_nonce_p256_1() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        let mut ord = BigNum::new().unwrap();
+        ecvrf.group.order(&mut ord, &mut ecvrf.bn_ctx).unwrap();
+
+        let hex_private_key = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
+        let private_key = BigNum::from_slice(&hex_private_key).unwrap();
+
+        // hex encoded -> 'sample'
+        let alpha = hex::decode("73616d706c65").unwrap();
+
+        let result_nonce = ecvrf.generate_nonce(&private_key, &alpha).unwrap();
+
+        let expected_result = hex::decode("A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60").unwrap();
+        
+        assert_eq!(result_nonce.to_vec(), expected_result);
+    }
+
+    /// Test vector for `P-256` curve with `SHA-256` as specified in
+    /// [Section A.2.5 \[RFC6979\]](https://tools.ietf.org/html/rfc6979)
+    ///
+    #[test]
+    fn test_generate_nonce_p256_2() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        let mut ord = BigNum::new().unwrap();
+        ecvrf.group.order(&mut ord, &mut ecvrf.bn_ctx).unwrap();
+
+        let hex_private_key = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
+        let private_key = BigNum::from_slice(&hex_private_key).unwrap();
+
+        // hex encoded -> 'test'
+        let alpha = hex::decode("74657374").unwrap();
+
+        let result_nonce = ecvrf.generate_nonce(&private_key, &alpha).unwrap();
+
+        let expected_result = hex::decode("D16B6AE827F17175E040871A1C7EC3500192C4C92677336EC2537ACAEE0008E0").unwrap();
+        
+        assert_eq!(result_nonce.to_vec(), expected_result);
     }
 }
