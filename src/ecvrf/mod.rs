@@ -753,4 +753,26 @@ mod tests {
         
         assert_eq!(computed_c.to_vec(), expected_c);
     }
+
+    /// Test decode_proof vector for `P256-SHA256-TAI` cipher suite as specified in
+    /// [Section A.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    #[test]
+    fn test_decode_proof() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        let pi_hex = hex::decode("029bdca4cc39e57d97e2f42f88bcf0ecb1120fb67eb408a856050dbfbcbf57c524347fc46ccd87843ec0a9fdc090a407c6fbae8ac1480e240c58854897eabbc3a7bb61b201059f89186e7175af796d65e7").unwrap();
+        let (derived_gamma, derived_c, _) = ecvrf.decode_proof(&pi_hex).unwrap();
+
+        // Expected values
+        let mut gamma_hex = pi_hex.clone();
+        let c_s_hex = gamma_hex.split_off(33);
+        let mut c_hex = c_s_hex.clone();
+        c_hex.truncate(16);
+        let expected_gamma = EcPoint::from_bytes(&ecvrf.group, &gamma_hex, &mut ecvrf.bn_ctx).unwrap();
+        let expected_c = BigNum::from_slice(c_hex.as_slice()).unwrap();
+
+        assert!(derived_c.eq(&expected_c));
+        assert!(expected_gamma.eq(&ecvrf.group, &derived_gamma, &mut ecvrf.bn_ctx).unwrap());
+    }
 }
