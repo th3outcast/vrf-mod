@@ -82,7 +82,7 @@ fn main() {
     let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
     // Private Key, Public Key (derived) & message
     let private_key = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
-    let public_key = ecvrf.derive_public_key(&secret_key).unwrap();
+    let public_key = ecvrf.derive_public_key(&private_key).unwrap();
     let message: &[u8] = b"sample";
     
     // ECVRF proof and hash output
