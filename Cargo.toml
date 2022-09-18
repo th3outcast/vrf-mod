@@ -6,7 +6,8 @@ license = "MIT"
 description = "An extensible rust library for building VRF functionality with support for Elliptical Curve VRFs (secp256k1, secp256r1 curves)."
 readme = "README.md"
 repository = "https://github.com/th3outcast/vrf-mod"
-keywords = ["cryptography", "vrf"]
+keywords = ["cryptography", "vrf", "ecvrf"]
+homepage = "https://github.com/th3outcast/vrf-mod"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
