@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn os2ip_test() {
-        let mut octets = vec![213, 86, 147, 107, 251, 127];
+        let octets = vec![213, 86, 147, 107, 251, 127];
         let result = os2ip(&octets).unwrap();
 
         let expected_result = BigNum::from_dec_str("234567817231231").unwrap();
