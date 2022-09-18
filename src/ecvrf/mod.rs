@@ -575,7 +575,7 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
                 &u_point, 
                 &v_point,
             ]
-        )?;
+        )?;println!("{:?}, {:?}", c, derived_c);
 
         // 6. Validity check
         if c == derived_c {
@@ -776,7 +776,7 @@ mod tests {
         assert!(expected_gamma.eq(&ecvrf.group, &derived_gamma, &mut ecvrf.bn_ctx).unwrap());
     }
 
-    /// Test for `P256-SHA256-TAI` cipher suite
+    /// Test prove for `P256-SHA256-TAI` cipher suite
     /// 
     #[test]
     fn test_prove_p256_sha256_tai() {
@@ -792,19 +792,57 @@ mod tests {
         assert_eq!(pi, expected_pi);
     }
 
-    /// Test for `SECP256K1-SHA256-TAI` cipher suite
+    /// Test prove for `SECP256K1-SHA256-TAI` cipher suite
     /// 
     #[test]
     fn test_prove_secp256k1_sha256_tai() {
         let mut ecvrf = ECVRF::from_suite(CipherSuite::SECP256k1_SHA256_TAI).unwrap();
         // private key
         let x = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
-        
+        // hex -> 'sample'
         let alpha = hex::decode("73616d706c65").unwrap();
 
         let pi = ecvrf.prove(&x, &alpha).unwrap();
+        
         let expected_pi = hex::decode("031f4dbca087a1972d04a07a779b7df1caa99e0f5db2aa21f3aecc4f9e10e85d08748c9fbe6b95d17359707bfb8e8ab0c93ba0c515333adcb8b64f372c535e115ccf66ebf5abe6fadb01b5efb37c0a0ec9").unwrap();
         
         assert_eq!(pi, expected_pi);
+    }
+
+    /// Test verify for `P256-SHA256-TAI` cipher suite as specified in
+    /// [Section A.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    /// 
+    #[test]
+    fn test_verify_p256_sha256_tai() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+        // Public Key
+        let public_key = hex::decode("0360fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6").unwrap();
+        // hex -> 'sample'
+        let alpha = hex::decode("73616d706c65").unwrap();
+        // ecvrf proof
+        let pi = hex::decode("029bdca4cc39e57d97e2f42f88bcf0ecb1120fb67eb408a856050dbfbcbf57c524347fc46ccd87843ec0a9fdc090a407c6fbae8ac1480e240c58854897eabbc3a7bb61b201059f89186e7175af796d65e7").unwrap();
+
+        let beta = ecvrf.verify(&public_key, &alpha, &pi).unwrap();
+        let expected_beta = hex::decode("59ca3801ad3e981a88e36880a3aee1df38a0472d5be52d6e39663ea0314e594c").unwrap();
+        
+        assert_eq!(beta, expected_beta);
+    }
+
+    /// Test verify for `SECP256K1-SHA256-TAI` cipher suite
+    /// 
+    #[test]
+    fn test_verify_secp256k1_sha256_tai() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::SECP256k1_SHA256_TAI).unwrap();
+        // Public Key
+        let public_key = hex::decode("032c8c31fc9f990c6b55e3865a184a4ce50e09481f2eaeb3e60ec1cea13a6ae645").unwrap();
+        // hex -> 'sample'
+        let alpha = hex::decode("73616d706c65").unwrap();
+        // ecvrf proof
+        let pi = hex::decode("031f4dbca087a1972d04a07a779b7df1caa99e0f5db2aa21f3aecc4f9e10e85d0814faa89697b482daa377fb6b4a8b0191a65d34a6d90a8a2461e5db9205d4cf0bb4b2c31b5ef6997a585a9f1a72517b6f").unwrap();
+
+        let beta = ecvrf.verify(&public_key, &alpha, &pi).unwrap();
+        let expected_beta = hex::decode("612065e309e937ef46c2ef04d5886b9c6efd2991ac484ec64a9b014366fc5d81").unwrap();
+        
+        assert_eq!(beta, expected_beta);
     }
 }
