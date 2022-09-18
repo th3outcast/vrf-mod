@@ -585,3 +585,89 @@ impl ECVRF_trait<&[u8], &[u8]> for ECVRF {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test vector for `P256-SHA256-TAI` cipher suite as specified in
+    /// [Section A.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    #[test]
+    fn test_hash_to_try_and_increment_1() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        // hex encoded -> 'sample'
+        let alpha = hex::decode("73616d706c65").unwrap();
+
+        let hex_public_key = hex::decode("0360fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6").unwrap();
+        let public_key = EcPoint::from_bytes(
+            &ecvrf.group, &hex_public_key, &mut ecvrf.bn_ctx
+        ).unwrap();
+
+        let result = ecvrf.hash_to_try_and_increment(&public_key, &alpha).unwrap();
+        let result_bytes = result.to_bytes(
+            &ecvrf.group,
+            PointConversionForm::COMPRESSED,
+            &mut ecvrf.bn_ctx,
+        ).unwrap();
+
+        let expected_result = hex::decode("02e2e1ab1b9f5a8a68fa4aad597e7493095648d3473b213bba120fe42d1a595f3e").unwrap();
+
+        assert_eq!(result_bytes, expected_result);
+    }
+
+    /// Test vector for `P256-SHA256-TAI` cipher suite as specified in
+    /// [Section A.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    #[test]
+    fn test_hash_to_try_and_increment_2() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        // hex encoded -> 'test'
+        let alpha = hex::decode("74657374").unwrap();
+
+        let hex_public_key = hex::decode("0360fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6").unwrap();
+        let public_key = EcPoint::from_bytes(
+            &ecvrf.group, &hex_public_key, &mut ecvrf.bn_ctx
+        ).unwrap();
+
+        let result = ecvrf.hash_to_try_and_increment(&public_key, &alpha).unwrap();
+        let result_bytes = result.to_bytes(
+            &ecvrf.group,
+            PointConversionForm::COMPRESSED,
+            &mut ecvrf.bn_ctx,
+        ).unwrap();
+
+        let expected_result = hex::decode("02ca565721155f9fd596f1c529c7af15dad671ab30c76713889e3d45b767ff6433").unwrap();
+
+        assert_eq!(result_bytes, expected_result);
+    }
+
+    /// Test vector for `P256-SHA256-TAI` cipher suite as specified in
+    /// [Section A.1 \[VRF-draft-05\]](https://tools.ietf.org/pdf/draft-irtf-cfrg-vrf-05)
+    ///
+    #[test]
+    fn test_hash_to_try_and_increment_3() {
+        let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
+
+        // hex encoded -> 'test'
+        let alpha = hex::decode("4578616d706c65206f66204543445341207769746820616e736970323536723120616e64205348412d323536").unwrap();
+
+        let hex_public_key = hex::decode("03596375e6ce57e0f20294fc46bdfcfd19a39f8161b58695b3ec5b3d16427c274d").unwrap();
+        let public_key = EcPoint::from_bytes(
+            &ecvrf.group, &hex_public_key, &mut ecvrf.bn_ctx
+        ).unwrap();
+
+        let result = ecvrf.hash_to_try_and_increment(&public_key, &alpha).unwrap();
+        let result_bytes = result.to_bytes(
+            &ecvrf.group,
+            PointConversionForm::COMPRESSED,
+            &mut ecvrf.bn_ctx,
+        ).unwrap();
+
+        let expected_result = hex::decode("02141e41d4d55802b0e3adaba114c81137d95fd3869b6b385d4487b1130126648d").unwrap();
+
+        assert_eq!(result_bytes, expected_result);
+    }
+}
