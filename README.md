@@ -19,7 +19,7 @@ Supported cipher suites include:
 
 ```rust
 use vrf_mod::vrf::{VRFCipherSuite, VRF};
-use vrf_mod::VRF;
+use vrf_mod::VRF as VRF_trait;
 use openssl::rsa::Rsa;
 
 fn main() {
@@ -75,22 +75,22 @@ Supported cipher suites include:
 
 ```rust
 use vrf_mod::ecvrf::{CipherSuite, ECVRF};
-use vrf_mod::ECVRF;
+use vrf_mod::ECVRF as ECVRF_trait;
 
 fn main() {
     // Initialization of VRF context by providing a curve
     let mut ecvrf = ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap();
     // Private Key, Public Key (derived) & message
-    let secret_key = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
+    let private_key = hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
     let public_key = ecvrf.derive_public_key(&secret_key).unwrap();
     let message: &[u8] = b"sample";
     
     // ECVRF proof and hash output
-    let pi = ecvrf.prove(&secret_key, &message).unwrap();
+    let pi = ecvrf.prove(&private_key, &message).unwrap();
     let hash = ecvrf.proof_to_hash(&pi).unwrap();
 
     // ECVRF proof verification (returns ECVRF hash output)
-    let beta = vrf.verify(&public_key, &message, &pi);
+    let beta = ecvrf.verify(&public_key, &message, &pi);
 }
 ```
 
